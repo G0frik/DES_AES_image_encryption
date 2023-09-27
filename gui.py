@@ -4,6 +4,7 @@ from Crypto.Cipher import DES
 from Crypto.Random import get_random_bytes
 import tkinter as tk
 from tkinter import filedialog
+from tkinter import ttk
 from despycryprtodome import encrypt_image,decrypt_image
 import time
 
@@ -68,9 +69,12 @@ def decrypt_button_click():
 
     display_image(decryptedImage, "Decrypted Image")
 
-def set_mode():
-    mode = mode_var.get()
-    mode_label.config(text=f"Selected Mode: {mode_names.get(mode, 'Unknown')}")
+def set_mode(event):
+    selected_mode_name = mode_combobox.get()
+    for mode_value, mode_name in mode_names.items():
+        if mode_name == selected_mode_name:
+            mode_var.set(mode_value)
+            mode_label.config(text=f"Selected Mode: {mode_name}")
 
 def set_key():
     global key
@@ -123,7 +127,7 @@ title_label.pack(anchor=tk.N)
 
 # Create two frames to separate the button groups
 mode_var = tk.IntVar()
-mode_var.set(DES.MODE_CBC)
+#mode_var.set(DES.MODE_CBC)
 
 key_frame = tk.Frame(root)
 key_frame.pack(side=tk.LEFT, padx=10)
@@ -145,11 +149,15 @@ save_key_button.pack()
 read_key_button = tk.Button(key_frame, text="Read Key from File", command=read_key_from_file)
 read_key_button.pack()
 
-mode_label = tk.Label(action_frame, text="Selected Mode: None")
+mode_label = tk.Label(action_frame, text=f"Selected Mode: {mode_names.get(mode_var.get())}")
 mode_label.pack()
-for mode_value, mode_name in mode_names.items():
-    mode_radio = tk.Radiobutton(action_frame, text=mode_name, variable=mode_var, value=mode_value, command=set_mode)
-    mode_radio.pack(anchor=tk.W)
+
+mode_combobox = ttk.Combobox(action_frame, values=list(mode_names.values()), state="readonly")
+mode_combobox.set("Select Mode")  # Set the default text
+mode_combobox.pack()
+
+# Bind the set_mode function to the Combobox selection event
+mode_combobox.bind("<<ComboboxSelected>>", set_mode)
 
 
 line_canvas = tk.Canvas(root, width=2, height=600, bg="black")
