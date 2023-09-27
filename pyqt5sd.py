@@ -2,11 +2,13 @@ import sys
 import cv2
 from Crypto.Cipher import DES,AES
 from Crypto.Random import get_random_bytes
-from PyQt5 import QtWidgets, QtCore
+from PyQt5 import QtWidgets, QtCore,QtGui
 from PyQt5.QtWidgets import QFileDialog, QComboBox, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout
 from despycryprtodome import encrypt_image,decrypt_image,save_image,load_image,display_image
 import qdarkstyle
 global key
+global current_stylesheet
+current_stylesheet = "dark"
 mode_names = {
     DES.MODE_CBC: "DES.MODE_CBC",
     DES.MODE_ECB: "DES.MODE_ECB",
@@ -19,13 +21,17 @@ cipher_names={
 class MyApp(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
+        #self.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
 
+        self.theme_toggle_button = QPushButton("Toggle Theme")
+        self.theme_toggle_button.setObjectName("theme_toggle_button")
         self.key_label = QLabel("Enter Key:")
         self.key_entry = QLineEdit()
         self.set_key_button = QPushButton("Set Key")
         self.generate_key_button = QPushButton("Generate Random Key")
         self.save_key_button = QPushButton("Save Key to File")
         self.read_key_button = QPushButton("Read Key from File")
+
 
         self.cipher_label= QLabel("Selected Cipher: None")
         #self.cipher_label.setFixedHeight(10)
@@ -42,6 +48,7 @@ class MyApp(QtWidgets.QWidget):
 
         self.encrypt_button = QPushButton("Encrypt Image")
         self.decrypt_button = QPushButton("Decrypt Image")
+        self.default_stylesheet = self.styleSheet()
 
         self.init_ui()
 
@@ -57,6 +64,7 @@ class MyApp(QtWidgets.QWidget):
         #vbox_right.setSpacing(10)  # Adjust the spacing as needed
 
         # Add widgets to left layout
+        vbox_left.addWidget(self.theme_toggle_button)
         vbox_left.addWidget(self.key_label)
         vbox_left.addWidget(self.key_entry)
         vbox_left.addWidget(self.set_key_button)
@@ -89,6 +97,7 @@ class MyApp(QtWidgets.QWidget):
         self.mode_combobox.currentIndexChanged.connect(self.set_mode)
         self.encrypt_button.clicked.connect(self.encrypt_button_click)
         self.decrypt_button.clicked.connect(self.decrypt_button_click)
+        self.theme_toggle_button.clicked.connect(self.toggle_theme)
 
 
 
@@ -181,13 +190,69 @@ class MyApp(QtWidgets.QWidget):
         decryptedImage = decrypt_image(encryptedImage, key, mode)
         display_image(decryptedImage,"Decrypted image")
 
+    def toggle_theme(self):
+        global current_stylesheet
+
+        print(type(current_stylesheet))
+        print(self.default_stylesheet)
+        print(current_stylesheet, "now")
+
+        # Check if the current theme is dark
+        if 'white' in current_stylesheet:
+            print("not dark")
+            self.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
+            print(self.styleSheet())
+            current_stylesheet = "dark"
+            for button in self.findChildren(QPushButton):
+                button.setStyleSheet(  """
+                           background-color: #455364;
+                           color: #E0E1E3;
+                           border-radius: 4px;
+                           padding: 2px;
+                           outline: none;
+                           border: none;
+                           """)
+
+        elif 'dark' == current_stylesheet:
+            print(current_stylesheet, "Nofuck123")
+            print(self.styleSheet())
+            # Switch to the light theme
+            print(self.default_stylesheet)
+            self.setStyleSheet(self.default_stylesheet + """
+                /* Custom light theme styles */
+                background-color: white; /* Set background color to white */
+                color: black; /* Set text color to black */
+            """)
+
+            # Set the style for all QPushButton widgets
+            for button in self.findChildren(QPushButton):
+                button.setStyleSheet("""
+                    background-color: light gray;
+                    color: black;
+                    border-radius: 4px;
+                    padding: 2px;
+                    outline: none;
+                    border: 1px solid black;
+                """)
+
+
+
+            # Remove any existing stylesheet
+
+            # Set your custom light theme stylesheet
+            current_stylesheet="white"
+            print(current_stylesheet)
+
+
+
+
         # Display decrypted image (consider using QLabel to display images in PyQt)
         # display_image(decryptedImage, "Decrypted Image")
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
-    #app.setStyle("Fusion")  # Optional: Use the Fusion style for a more modern look
+    app.setStyle("Fusion")  # Optional: Use the Fusion style for a more modern look
     window = MyApp()
     window.setWindowTitle("Image Encryption/Decryption")
     window.setGeometry(100,100,800, 400)  # Adjust the window size
