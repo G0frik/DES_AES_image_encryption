@@ -2,29 +2,47 @@ import sys
 import cv2
 from Crypto.Cipher import DES,AES
 from Crypto.Random import get_random_bytes
-from PyQt5 import QtWidgets, QtCore,QtGui
-from PyQt5.QtWidgets import QFileDialog, QComboBox, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout
+from PyQt5 import QtWidgets, QtCore
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon,QPixmap
+from PyQt5.QtWidgets import QFileDialog, QComboBox, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout,QFrame
 from despycryprtodome import encrypt_image,decrypt_image,save_image,load_image,display_image
 import qdarkstyle
 global key
 global current_stylesheet
 current_stylesheet = "dark"
-mode_names = {
-    DES.MODE_CBC: "DES.MODE_CBC",
-    DES.MODE_ECB: "DES.MODE_ECB",
+
+mode_des_names = {
+    DES.MODE_CBC: "CBC",
+    DES.MODE_ECB: "ECB",
+}
+mode_aes_names={
+AES.MODE_CBC: "CBC",
+    AES.MODE_ECB: "ECB",
 }
 cipher_names={
     DES: "DES",
     AES: "AES"
 }
 
+
+
 class MyApp(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         #self.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
 
-        self.theme_toggle_button = QPushButton("Toggle Theme")
+        self.theme_toggle_button = QPushButton()
         self.theme_toggle_button.setObjectName("theme_toggle_button")
+        self.theme_toggle_button.setIcon(QIcon("image (1).png"))  # Replace with the path to your dark theme image
+        self.theme_toggle_button.setIconSize(QtCore.QSize(50, 50))
+        self.theme_toggle_button.setFixedSize(50, 50)
+        self.theme_toggle_button.setStyleSheet("background-color: transparent;")# Replace with the path to your dark theme image
+
+        self.separator = QFrame()
+        self.separator.setFrameShape(QFrame.VLine)
+        self.separator.setFrameShadow(QFrame.Sunken)
+
         self.key_label = QLabel("Enter Key:")
         self.key_entry = QLineEdit()
         self.set_key_button = QPushButton("Set Key")
@@ -40,11 +58,10 @@ class MyApp(QtWidgets.QWidget):
         self.cipher_combobox.addItem("None", None)
         for cipher_value, cipher_name in cipher_names.items():
             self.cipher_combobox.addItem(cipher_name, cipher_value)
+
         self.mode_label = QLabel("Selected Mode: None")
         self.mode_combobox = QComboBox()
         self.mode_combobox.addItem("None", None)
-        for mode_value, mode_name in mode_names.items():
-            self.mode_combobox.addItem(mode_name, mode_value)
 
         self.encrypt_button = QPushButton("Encrypt Image")
         self.decrypt_button = QPushButton("Decrypt Image")
@@ -57,6 +74,8 @@ class MyApp(QtWidgets.QWidget):
         vbox_left = QVBoxLayout()
         vbox_right = QVBoxLayout()
 
+
+
         # Set alignment and spacing for both layouts
         vbox_left.setAlignment(QtCore.Qt.AlignBottom)
         vbox_right.setAlignment(QtCore.Qt.AlignBottom)
@@ -64,7 +83,7 @@ class MyApp(QtWidgets.QWidget):
         #vbox_right.setSpacing(10)  # Adjust the spacing as needed
 
         # Add widgets to left layout
-        vbox_left.addWidget(self.theme_toggle_button)
+
         vbox_left.addWidget(self.key_label)
         vbox_left.addWidget(self.key_entry)
         vbox_left.addWidget(self.set_key_button)
@@ -73,6 +92,10 @@ class MyApp(QtWidgets.QWidget):
         vbox_left.addWidget(self.read_key_button)
 
         # Add widgets to right layout
+        spacer = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+
+        vbox_right.addWidget(self.theme_toggle_button,alignment=Qt.AlignmentFlag.AlignRight)
+        vbox_right.addSpacerItem(spacer)
         vbox_right.addWidget(self.cipher_label)
         vbox_right.addWidget(self.cipher_combobox)
         vbox_right.addWidget(self.mode_label)
@@ -84,27 +107,65 @@ class MyApp(QtWidgets.QWidget):
         hbox = QHBoxLayout()
 
         # Add the left and right layouts to the horizontal layout with stretches
-        hbox.addLayout(vbox_left, stretch=1)  # Adjust the stretch factor as needed
+        hbox.addLayout(vbox_left, stretch=1)
+        hbox.addWidget(self.separator)        # Adjust the stretch factor as needed
         hbox.addLayout(vbox_right, stretch=1)  # Adjust the stretch factor as needed
 
         # Set the horizontal layout as the main layout for your window
         self.setLayout(hbox)
-
         self.set_key_button.clicked.connect(self.set_key)
         self.generate_key_button.clicked.connect(self.generate_random_key)
         self.save_key_button.clicked.connect(self.save_key_to_file)
         self.read_key_button.clicked.connect(self.read_key_from_file)
         self.mode_combobox.currentIndexChanged.connect(self.set_mode)
+        self.cipher_combobox.currentIndexChanged.connect(self.set_cipher)
         self.encrypt_button.clicked.connect(self.encrypt_button_click)
         self.decrypt_button.clicked.connect(self.decrypt_button_click)
         self.theme_toggle_button.clicked.connect(self.toggle_theme)
+        self.cipher_combobox.currentIndexChanged.connect(self.update_mode_combobox)
+
+        self.update_mode_combobox()
+
+    def test(self):
+
+        print("Image clicked.")
+
+    def update_mode_combobox(self):
+        selected_cipher = self.cipher_combobox.currentData()
+        print(selected_cipher)# Get the selected cipher value
+        print(DES)
+        # Clear the mode combobox
+        self.mode_combobox.clear()
+
+        # Add "None" option to the mode combobox
+        self.mode_combobox.addItem("None", None)
+
+        if selected_cipher == DES:
+            # Add DES modes if DES is selected
+            for mode_val, mode_name in mode_des_names.items():
+                self.mode_combobox.addItem(mode_name, mode_val)
 
 
+        elif selected_cipher == AES:
+            # Add AES modes if AES is selected
+            self.mode_combobox.addItem(mode_aes_names[AES.MODE_ECB], AES.MODE_ECB)
+            self.mode_combobox.addItem(mode_aes_names[AES.MODE_CBC], AES.MODE_CBC)
 
     def set_mode(self, index):
         mode_var = self.mode_combobox.itemData(index)
-        self.mode_label.setText(f"Selected Mode: {mode_names.get(mode_var)}")
 
+        selected_cipher = self.cipher_combobox.currentData()
+        if selected_cipher == DES:
+            mode_name = mode_des_names.get(mode_var)
+        elif selected_cipher == AES:
+            mode_name = mode_aes_names.get(mode_var)
+        else:
+            mode_name = None
+
+        self.mode_label.setText(f"Selected Mode: {mode_name if mode_name else 'None'}")
+    def set_cipher(self, index):
+        cipher_var = self.cipher_combobox.itemData(index)
+        self.cipher_label.setText(f"Selected Cipher: {cipher_names.get(cipher_var)}")
     def set_key(self):
         global key
 
@@ -153,8 +214,11 @@ class MyApp(QtWidgets.QWidget):
                 self.key_entry.clear()
                 self.key_entry.insert(0, "File Not Found")
 
-    def encrypt_button_click(self):
+    def encrypt_button_click(self,index):
         mode = self.mode_combobox.currentData()
+        cipher_name=self.cipher_combobox.currentData()
+        #print(mode)
+        #print(DES.MODE_CBC,AES.MODE_CBC)
         if mode != DES.MODE_CBC and mode != DES.MODE_ECB:
             print('Only CBC and ECB mode supported...')
             sys.exit()
@@ -171,7 +235,7 @@ class MyApp(QtWidgets.QWidget):
         # Display encrypted image (consider using QLabel to display images in PyQt)
         # display_image(encryptedImage, "Encrypted image")
         display_image(encryptedImage,"Encrypted image")
-        encrypted_filename = f'{mode_names.get(mode, "unknown")}_encrypted_{file_path.split("/")[-1]}.bmp'
+        encrypted_filename = f'{cipher_names.get(cipher_name, "unknown")}_{mode_des_names.get(mode, "unknown")}_encrypted_{file_path.split("/")[-1]}.bmp'
         print(encrypted_filename)
         save_image(encryptedImage, encrypted_filename)
 
@@ -212,6 +276,12 @@ class MyApp(QtWidgets.QWidget):
                            outline: none;
                            border: none;
                            """)
+            self.theme_toggle_button.setIcon(QIcon("image (1).png"))
+            self.theme_toggle_button.setStyleSheet("background-color: transparent;")
+            self.separator.setStyleSheet("""
+                        background-color:#455364;
+                        """)
+
 
         elif 'dark' == current_stylesheet:
             print(current_stylesheet, "Nofuck123")
@@ -222,18 +292,30 @@ class MyApp(QtWidgets.QWidget):
                 /* Custom light theme styles */
                 background-color: white; /* Set background color to white */
                 color: black; /* Set text color to black */
+                
             """)
+            self.theme_toggle_button.setIcon(QIcon("output-onlinepngtools.png"))
+
 
             # Set the style for all QPushButton widgets
+
             for button in self.findChildren(QPushButton):
                 button.setStyleSheet("""
                     background-color: light gray;
                     color: black;
                     border-radius: 4px;
-                    padding: 2px;
+                    padding: 1px;
                     outline: none;
                     border: 1px solid black;
                 """)
+
+            self.separator.setStyleSheet("""
+            background-color:#455364;
+            """)
+
+            self.theme_toggle_button.setStyleSheet("background-color: transparent;")
+
+
 
 
 
