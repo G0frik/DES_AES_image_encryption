@@ -1,7 +1,7 @@
 import sys
 import cv2
 import numpy as np
-from Crypto.Cipher import DES
+from Crypto.Cipher import DES,AES
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
 
@@ -19,7 +19,10 @@ def encrypt_image(image, key, mode):
     imageBytes = image.tobytes()
 
     # Encrypt
-    ivSize = DES.block_size if mode == DES.MODE_CBC else 0
+    block_size = DES.block_size if mode == DES.MODE_CBC or DES.MODE_ECB else AES.block_size
+    ivSize = block_size if mode == DES.MODE_CBC or mode == AES.MODE_CBC else 0
+    print(ivSize)
+
     iv = get_random_bytes(ivSize)
     cipher = DES.new(key, mode, iv) if mode == DES.MODE_CBC else DES.new(key, DES.MODE_ECB)
     imageBytesPadded = pad(imageBytes, DES.block_size)
@@ -86,7 +89,7 @@ def main():
 
     # Encrypt
     key = get_random_bytes(keySize)
-    encryptedImage = encrypt_image(imageOrig, key, mode)
+    encryptedImage = encrypt_image(imageOrig, key, AES.MODE_CBC)
 
     # Display encrypted image
     display_image(encryptedImage, "Encrypted image")
