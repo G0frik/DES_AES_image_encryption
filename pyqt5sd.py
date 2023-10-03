@@ -15,10 +15,25 @@ current_stylesheet = "dark"
 mode_des_names = {
     DES.MODE_CBC: "CBC",
     DES.MODE_ECB: "ECB",
+    DES.MODE_CFB: "CFB",
+    DES.MODE_CTR: "CTR",
+    DES.MODE_EAX: "EAX",
+    DES.MODE_OFB: "OFB",
+    DES.MODE_OPENPGP: "OPENPGP"
 }
+#to this dictionary add all modes that are available for AES
 mode_aes_names={
-AES.MODE_CBC: "CBC",
     AES.MODE_ECB: "ECB",
+    AES.MODE_CBC: "CBC",
+    AES.MODE_OFB: "OFB",
+    AES.MODE_CFB: "CFB",
+    AES.MODE_CTR: "CTR",
+    AES.MODE_CCM: "CCM",
+    AES.MODE_EAX: "EAX",
+    AES.MODE_GCM: "GCM",
+    AES.MODE_SIV: "SIV",
+    AES.MODE_OCB: "OCB",
+    AES.MODE_OPENPGP: "OPENPGP",
 }
 cipher_names={
     DES: "DES",
@@ -145,11 +160,9 @@ class MyApp(QtWidgets.QWidget):
             for mode_val, mode_name in mode_des_names.items():
                 self.mode_combobox.addItem(mode_name, mode_val)
 
-
         elif selected_cipher == AES:
-            # Add AES modes if AES is selected
-            self.mode_combobox.addItem(mode_aes_names[AES.MODE_ECB], AES.MODE_ECB)
-            self.mode_combobox.addItem(mode_aes_names[AES.MODE_CBC], AES.MODE_CBC)
+            for mode_val, mode_name in mode_aes_names.items():
+                self.mode_combobox.addItem(mode_name, mode_val)
 
     def set_mode(self, index):
         mode_var = self.mode_combobox.itemData(index)
