@@ -166,23 +166,45 @@ class MyApp(QtWidgets.QWidget):
     def set_cipher(self, index):
         cipher_var = self.cipher_combobox.itemData(index)
         self.cipher_label.setText(f"Selected Cipher: {cipher_names.get(cipher_var)}")
+
     def set_key(self):
         global key
 
         key_str = self.key_entry.text()
-        key_bytes = key_str.encode('utf-8')
+        selected_cipher = self.cipher_combobox.currentData()
 
-        if len(key_bytes) != 8:
-            self.key_entry.clear()
-            self.key_entry.insert("Key must be 8 bytes")
+        if selected_cipher == DES:
+            if len(key_str) != 8:
+                self.key_entry.clear()
+                self.key_entry.insert("Key must be 8 bytes")
+        elif selected_cipher == AES:
+            if len(key_str) != 16:
+                self.key_entry.clear()
+                self.key_entry.insert("Key must be 16 bytes")
         else:
-            key = key_bytes
+            self.key_entry.clear()
+            self.key_entry.insert("No cipher selected")
+
+        key_bytes = key_str.encode('utf-8')
+        key = key_bytes
 
     def generate_random_key(self):
         global key
-        key = get_random_bytes(8)
-        self.key_entry.clear()
-        self.key_entry.insert("Generated Random Key")
+        selected_cipher = self.cipher_combobox.currentData()
+        print(selected_cipher, "check")
+        if selected_cipher == DES:
+            key = get_random_bytes(8)
+            self.key_entry.clear()
+            self.key_entry.insert("Generated Random Key for DES")
+        elif selected_cipher == AES:
+            key = get_random_bytes(16)
+            self.key_entry.clear()
+            self.key_entry.insert("Generated Random Key for AES")
+        else:
+            self.key_entry.clear()
+            self.key_entry.insert("No cipher selected")
+
+
 
     def save_key_to_file(self):
         global key
@@ -216,7 +238,7 @@ class MyApp(QtWidgets.QWidget):
 
     def encrypt_button_click(self,index):
         mode = self.mode_combobox.currentData()
-        cipher_name=self.cipher_combobox.currentData()
+        selected_cipher=self.cipher_combobox.currentData()
         #print(mode)
         #print(DES.MODE_CBC,AES.MODE_CBC)
         if mode != DES.MODE_CBC and mode != DES.MODE_ECB:
@@ -230,12 +252,12 @@ class MyApp(QtWidgets.QWidget):
         imageOrig = load_image(file_path)
         display_image(imageOrig, "Original image")
 
-        encryptedImage = encrypt_image(imageOrig, key, mode)
+        encryptedImage = encrypt_image(imageOrig, key, mode,selected_cipher)
 
         # Display encrypted image (consider using QLabel to display images in PyQt)
         # display_image(encryptedImage, "Encrypted image")
         display_image(encryptedImage,"Encrypted image")
-        encrypted_filename = f'{cipher_names.get(cipher_name, "unknown")}_{mode_des_names.get(mode, "unknown")}_encrypted_{file_path.split("/")[-1]}.bmp'
+        encrypted_filename = f'{cipher_names.get(selected_cipher, "unknown")}_{mode_des_names.get(mode, "unknown")}_encrypted_{file_path.split("/")[-1]}.bmp'
         print(encrypted_filename)
         save_image(encryptedImage, encrypted_filename)
 

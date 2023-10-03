@@ -11,30 +11,30 @@ def load_image(filename):
 def display_image(image, title):
     cv2.imshow(title, image)
     cv2.waitKey()
-def encrypt_image(image, key, mode):
-    print(image)
+def encrypt_image(image, key, mode, algorithm=DES):
     rowOrig, columnOrig, depthOrig = image.shape
 
     # Convert original image data to bytes
     imageBytes = image.tobytes()
 
-    # Encrypt
-    block_size = DES.block_size if mode == DES.MODE_CBC or DES.MODE_ECB else AES.block_size
-    ivSize = block_size if mode == DES.MODE_CBC or mode == AES.MODE_CBC else 0
-    print(ivSize)
+    # Determine block size based on the algorithm
+    if algorithm == DES:
+        ivSize = DES.block_size if mode == DES.MODE_CBC else 0
+        cipher = DES.new(key, mode, get_random_bytes(ivSize)) if mode == DES.MODE_CBC else DES.new(key, DES.MODE_ECB)
+    elif algorithm == AES:
+        ivSize = AES.block_size if mode == AES.MODE_CBC else 0
+        cipher = AES.new(key, mode, get_random_bytes(ivSize)) if mode == AES.MODE_CBC else AES.new(key, AES.MODE_ECB)
+    else:
+        raise ValueError("Unsupported algorithm")
 
-    iv = get_random_bytes(ivSize)
-    cipher = DES.new(key, mode, iv) if mode == DES.MODE_CBC else DES.new(key, DES.MODE_ECB)
-    imageBytesPadded = pad(imageBytes, DES.block_size)
+    # Pad and encrypt
+    imageBytesPadded = pad(imageBytes, cipher.block_size)
     ciphertext = cipher.encrypt(imageBytesPadded)
 
     # Convert ciphertext bytes to encrypted image data
     paddedSize = len(imageBytesPadded) - len(imageBytes)
-
     void = columnOrig * depthOrig - ivSize - paddedSize
-    ivCiphertextVoid = iv + ciphertext + bytes(void)
-    print(image.shape, void)
-    print(image.shape,image.dtype)
+    ivCiphertextVoid = get_random_bytes(ivSize) + ciphertext + bytes(void)
     encryptedImage = np.frombuffer(ivCiphertextVoid, dtype=image.dtype).reshape(rowOrig + 1, columnOrig, depthOrig)
 
     return encryptedImage
