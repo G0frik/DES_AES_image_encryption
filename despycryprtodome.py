@@ -4,6 +4,7 @@ import numpy as np
 from Crypto.Cipher import DES,AES
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
+from Crypto.Util import Counter
 
 def load_image(filename):
     return cv2.imread(filename)
@@ -18,12 +19,37 @@ def encrypt_image(image, key, mode, algorithm=DES):
     imageBytes = image.tobytes()
 
     # Determine block size based on the algorithm
+    #I want to use all modes for DES that are available in pycryptodome write me code for it
+
     if algorithm == DES:
-        ivSize = DES.block_size if mode == DES.MODE_CBC else 0
-        cipher = DES.new(key, mode, get_random_bytes(ivSize)) if mode == DES.MODE_CBC else DES.new(key, DES.MODE_ECB)
+        ivSize = DES.block_size if mode in [DES.MODE_CBC, DES.MODE_OFB, DES.MODE_CFB] else 0
+        if mode == DES.MODE_CBC:
+            cipher = DES.new(key, DES.MODE_CBC, get_random_bytes(ivSize))
+        elif mode == DES.MODE_OFB:
+            cipher = DES.new(key, DES.MODE_OFB, get_random_bytes(ivSize))
+        elif mode == DES.MODE_CFB:
+            cipher = DES.new(key, DES.MODE_CFB, get_random_bytes(ivSize), segment_size=64)
+        elif mode == DES.MODE_CTR:
+            # For CTR mode, we need to specify a counter object
+            counter = Counter.new(DES.block_size * 8)
+            cipher = DES.new(key, DES.MODE_CTR, counter=counter)
+        else:
+            cipher = DES.new(key, DES.MODE_ECB)
     elif algorithm == AES:
-        ivSize = AES.block_size if mode == AES.MODE_CBC else 0
-        cipher = AES.new(key, mode, get_random_bytes(ivSize)) if mode == AES.MODE_CBC else AES.new(key, AES.MODE_ECB)
+        ivSize = AES.block_size if mode in [AES.MODE_CBC, AES.MODE_OFB, AES.MODE_CFB, AES.MODE_CTR] else 0
+        if mode == AES.MODE_CBC:
+            cipher = AES.new(key, AES.MODE_CBC, get_random_bytes(ivSize))
+        elif mode == AES.MODE_OFB:
+            cipher = AES.new(key, AES.MODE_OFB, get_random_bytes(ivSize))
+        elif mode == AES.MODE_CFB:
+            cipher = AES.new(key, AES.MODE_CFB, get_random_bytes(ivSize))
+        elif mode == AES.MODE_CTR:
+
+            # For CTR mode, we need to specify a counter object
+            counter = Counter.new(AES.block_size * 8)
+            cipher = AES.new(key, AES.MODE_CTR, counter=counter)
+        else:
+            cipher = AES.new(key, AES.MODE_ECB)
     else:
         raise ValueError("Unsupported algorithm")
 

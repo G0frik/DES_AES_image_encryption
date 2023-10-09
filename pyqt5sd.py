@@ -254,9 +254,9 @@ class MyApp(QtWidgets.QWidget):
         selected_cipher=self.cipher_combobox.currentData()
         #print(mode)
         #print(DES.MODE_CBC,AES.MODE_CBC)
-        if mode != DES.MODE_CBC and mode != DES.MODE_ECB:
+        """if mode != DES.MODE_CBC and mode != DES.MODE_ECB:
             print('Only CBC and ECB mode supported...')
-            sys.exit()
+            sys.exit()"""
 
         file_path, _ = QFileDialog.getOpenFileName()
         if not file_path:
