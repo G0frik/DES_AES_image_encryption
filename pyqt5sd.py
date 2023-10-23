@@ -21,7 +21,7 @@ mode_des_names = {
     DES.MODE_OFB: "OFB",
     DES.MODE_OPENPGP: "OPENPGP"
 }
-#to this dictionary add all modes that are available for AES
+
 mode_aes_names={
     AES.MODE_ECB: "ECB",
     AES.MODE_CBC: "CBC",
@@ -224,6 +224,7 @@ class MyApp(QtWidgets.QWidget):
 
         file_path, _ = QFileDialog.getSaveFileName(filter="Text files (*.txt)")
 
+
         if file_path:
             try:
                 with open(file_path, "wb") as key_file:
@@ -244,7 +245,7 @@ class MyApp(QtWidgets.QWidget):
                 with open(file_path, "rb") as key_file:
                     key = key_file.read()
                     self.key_entry.clear()
-                    self.key_entry.insert(0, "Key was read from file")
+                    self.key_entry.insert("Key was read from file")
             except FileNotFoundError:
                 self.key_entry.clear()
                 self.key_entry.insert(0, "File Not Found")
@@ -252,13 +253,14 @@ class MyApp(QtWidgets.QWidget):
     def encrypt_button_click(self,index):
         mode = self.mode_combobox.currentData()
         selected_cipher=self.cipher_combobox.currentData()
-        #print(mode)
-        #print(DES.MODE_CBC,AES.MODE_CBC)
+        print(mode)
+        print(selected_cipher)
         """if mode != DES.MODE_CBC and mode != DES.MODE_ECB:
             print('Only CBC and ECB mode supported...')
             sys.exit()"""
 
         file_path, _ = QFileDialog.getOpenFileName()
+        print(file_path)
         if not file_path:
             return
 
@@ -275,10 +277,11 @@ class MyApp(QtWidgets.QWidget):
         save_image(encryptedImage, encrypted_filename)
 
     def decrypt_button_click(self):
+        selected_cipher = self.cipher_combobox.currentData()
         mode = self.mode_combobox.currentData()
-        if mode != DES.MODE_CBC and mode != DES.MODE_ECB:
+        """if mode != DES.MODE_CBC and mode != DES.MODE_ECB:
             print('Only CBC and ECB mode supported...')
-            sys.exit()
+            sys.exit()"""
 
         file_path, _ = QFileDialog.getOpenFileName()
         if not file_path:
@@ -286,7 +289,7 @@ class MyApp(QtWidgets.QWidget):
 
         encryptedImage = load_image(file_path)
 
-        decryptedImage = decrypt_image(encryptedImage, key, mode)
+        decryptedImage = decrypt_image(encryptedImage, key, mode,selected_cipher)
         display_image(decryptedImage,"Decrypted image")
 
     def toggle_theme(self):
