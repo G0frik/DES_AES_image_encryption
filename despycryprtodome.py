@@ -19,7 +19,6 @@ def encrypt_image(image, key, mode, algorithm=DES):
     imageBytes = image.tobytes()
 
     # Determine block size based on the algorithm
-    #I want to use all modes for DES that are available in pycryptodome write me code for it
 
     if algorithm == DES:
         ivSize = DES.block_size if mode in [DES.MODE_CBC, DES.MODE_OFB, DES.MODE_CFB] else 0

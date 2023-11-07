@@ -7,6 +7,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon,QPixmap
 from PyQt5.QtWidgets import QFileDialog, QComboBox, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout,QFrame
 from despycryprtodome import encrypt_image,decrypt_image,save_image,load_image,display_image
+from BBS_stream_cipher import blum_blum_shub_generator,encrypt,find_prime_congruent_number_x0
 import qdarkstyle
 global key
 global current_stylesheet
@@ -15,11 +16,6 @@ current_stylesheet = "dark"
 mode_des_names = {
     DES.MODE_CBC: "CBC",
     DES.MODE_ECB: "ECB",
-    DES.MODE_CFB: "CFB",
-    DES.MODE_CTR: "CTR",
-    DES.MODE_EAX: "EAX",
-    DES.MODE_OFB: "OFB",
-    DES.MODE_OPENPGP: "OPENPGP"
 }
 
 mode_aes_names={
@@ -37,7 +33,8 @@ mode_aes_names={
 }
 cipher_names={
     DES: "DES",
-    AES: "AES"
+    AES: "AES",
+    StreamCipherBBS: "Stream Cipher"
 }
 
 
@@ -248,7 +245,7 @@ class MyApp(QtWidgets.QWidget):
                     self.key_entry.insert("Key was read from file")
             except FileNotFoundError:
                 self.key_entry.clear()
-                self.key_entry.insert(0, "File Not Found")
+                self.key_entry.insert( "File Not Found")
 
     def encrypt_button_click(self,index):
         mode = self.mode_combobox.currentData()
