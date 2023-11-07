@@ -7,7 +7,8 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon,QPixmap
 from PyQt5.QtWidgets import QFileDialog, QComboBox, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout,QFrame
 from despycryprtodome import encrypt_image,decrypt_image,save_image,load_image,display_image
-from BBS_stream_cipher import blum_blum_shub_generator,encrypt,find_prime_congruent_number_x0
+from bbs_class import BBS_Stream_Cipher
+from math import gcd
 import qdarkstyle
 global key
 global current_stylesheet
@@ -34,7 +35,7 @@ mode_aes_names={
 cipher_names={
     DES: "DES",
     AES: "AES",
-    StreamCipherBBS: "Stream Cipher"
+    BBS_Stream_Cipher: "BBS Stream Cipher",
 }
 
 
@@ -55,6 +56,13 @@ class MyApp(QtWidgets.QWidget):
         self.separator.setFrameShape(QFrame.VLine)
         self.separator.setFrameShadow(QFrame.Sunken)
 
+        self.p_label = QLabel("Enter p:")
+        self.p_entry = QLineEdit()
+        self.q_label = QLabel("Enter q:")
+        self.q_entry = QLineEdit()
+        self.seed_label = QLabel("Enter seed:")
+        self.seed_entry = QLineEdit()
+        self.generate_bbs_values_button = QPushButton("Generate p, q, seed for BBS")
         self.key_label = QLabel("Enter Key:")
         self.key_entry = QLineEdit()
         self.set_key_button = QPushButton("Set Key")
@@ -95,7 +103,13 @@ class MyApp(QtWidgets.QWidget):
         #vbox_right.setSpacing(10)  # Adjust the spacing as needed
 
         # Add widgets to left layout
-
+        vbox_left.addWidget(self.p_label)
+        vbox_left.addWidget(self.p_entry)
+        vbox_left.addWidget(self.q_label)
+        vbox_left.addWidget(self.q_entry)
+        vbox_left.addWidget(self.seed_label)
+        vbox_left.addWidget(self.seed_entry)
+        vbox_left.addWidget(self.generate_bbs_values_button)
         vbox_left.addWidget(self.key_label)
         vbox_left.addWidget(self.key_entry)
         vbox_left.addWidget(self.set_key_button)
@@ -125,6 +139,7 @@ class MyApp(QtWidgets.QWidget):
 
         # Set the horizontal layout as the main layout for your window
         self.setLayout(hbox)
+        self.generate_bbs_values_button.clicked.connect(self.generate_random_bbs_values)
         self.set_key_button.clicked.connect(self.set_key)
         self.generate_key_button.clicked.connect(self.generate_random_key)
         self.save_key_button.clicked.connect(self.save_key_to_file)
@@ -138,9 +153,11 @@ class MyApp(QtWidgets.QWidget):
 
         self.update_mode_combobox()
 
-    def test(self):
-
-        print("Image clicked.")
+    def generate_random_bbs_values(self):
+        p, q, seed = BBS_Stream_Cipher.find_prime_congruent_number_x0()
+        self.p_entry.setText(str(p))
+        self.q_entry.setText(str(q))
+        self.seed_entry.setText(str(seed))
 
     def update_mode_combobox(self):
         selected_cipher = self.cipher_combobox.currentData()
@@ -248,46 +265,123 @@ class MyApp(QtWidgets.QWidget):
                 self.key_entry.insert( "File Not Found")
 
     def encrypt_button_click(self,index):
+        selected_cipher = self.cipher_combobox.currentData()
         mode = self.mode_combobox.currentData()
-        selected_cipher=self.cipher_combobox.currentData()
-        print(mode)
-        print(selected_cipher)
-        """if mode != DES.MODE_CBC and mode != DES.MODE_ECB:
-            print('Only CBC and ECB mode supported...')
-            sys.exit()"""
+
+        if selected_cipher is None:
+            print("Cipher and mode must be selected.")
+            return
 
         file_path, _ = QFileDialog.getOpenFileName()
-        print(file_path)
         if not file_path:
             return
 
         imageOrig = load_image(file_path)
         display_image(imageOrig, "Original image")
 
-        encryptedImage = encrypt_image(imageOrig, key, mode,selected_cipher)
+        if selected_cipher == BBS_Stream_Cipher:
+            #p, q, seed = BBS_Stream_Cipher.find_prime_congruent_number_x0()
+            p,q,seed=11,13,100
 
-        # Display encrypted image (consider using QLabel to display images in PyQt)
-        # display_image(encryptedImage, "Encrypted image")
-        display_image(encryptedImage,"Encrypted image")
-        encrypted_filename = f'{cipher_names.get(selected_cipher, "unknown")}_{mode_des_names.get(mode, "unknown")}_encrypted_{file_path.split("/")[-1]}.bmp'
-        print(encrypted_filename)
-        save_image(encryptedImage, encrypted_filename)
+            p_str = self.p_entry.text()
+            q_str = self.q_entry.text()
+            seed_str = self.seed_entry.text()
+
+            try:
+                p = int(p_str)
+                q = int(q_str)
+                seed = int(seed_str)
+                if gcd(seed, p*q) != 1:
+                    print("seed and p*q are not coprime")
+                    return
+
+            except ValueError:
+                print("Invalid input for p, q, or seed. Please enter valid integers.")
+                return
+            print(p,q,seed)
+            cipher = BBS_Stream_Cipher(p, q, seed)
+            keystream = cipher.blum_blum_shub_generator(imageOrig.nbytes * 8)
+
+            encryptedImage = cipher.encrypt_image(imageOrig, keystream,istext=False)
+            display_image(encryptedImage, "Encrypted image")
+            encrypted_filename = f'{cipher_names.get(selected_cipher, "unknown")}_encrypted_{file_path.split("/")[-1]}.bmp'
+            save_image(encryptedImage, encrypted_filename)
+        else:
+            mode = self.mode_combobox.currentData()
+            selected_cipher=self.cipher_combobox.currentData()
+            print(mode)
+            print(selected_cipher)
+            """if mode != DES.MODE_CBC and mode != DES.MODE_ECB:
+                print('Only CBC and ECB mode supported...')
+                sys.exit()"""
+
+            file_path, _ = QFileDialog.getOpenFileName()
+            print(file_path)
+            if not file_path:
+                return
+
+            imageOrig = load_image(file_path)
+            display_image(imageOrig, "Original image")
+
+            encryptedImage = encrypt_image(imageOrig, key, mode,selected_cipher)
+
+            # Display encrypted image (consider using QLabel to display images in PyQt)
+            # display_image(encryptedImage, "Encrypted image")
+            display_image(encryptedImage,"Encrypted image")
+            encrypted_filename = f'{cipher_names.get(selected_cipher, "unknown")}_{mode_des_names.get(mode, "unknown")}_encrypted_{file_path.split("/")[-1]}.bmp'
+            print(encrypted_filename)
+            save_image(encryptedImage, encrypted_filename)
+
 
     def decrypt_button_click(self):
+
         selected_cipher = self.cipher_combobox.currentData()
         mode = self.mode_combobox.currentData()
-        """if mode != DES.MODE_CBC and mode != DES.MODE_ECB:
-            print('Only CBC and ECB mode supported...')
-            sys.exit()"""
+
+        if selected_cipher is None:
+            print("Cipher and mode must be selected.")
+            return
 
         file_path, _ = QFileDialog.getOpenFileName()
         if not file_path:
             return
 
-        encryptedImage = load_image(file_path)
+        if selected_cipher == BBS_Stream_Cipher:
+            p, q, seed = BBS_Stream_Cipher.find_prime_congruent_number_x0()
+            p, q, seed = 11, 13, 100
+            p_str = self.p_entry.text()
+            q_str = self.q_entry.text()
+            seed_str = self.seed_entry.text()
 
-        decryptedImage = decrypt_image(encryptedImage, key, mode,selected_cipher)
-        display_image(decryptedImage,"Decrypted image")
+            try:
+                p = int(p_str)
+                q = int(q_str)
+                seed = int(seed_str)
+            except ValueError:
+                print("Invalid input for p, q, or seed. Please enter valid integers.")
+                return
+            print(p,q,seed)
+            cipher = BBS_Stream_Cipher(p, q, seed)
+            keystream = cipher.blum_blum_shub_generator(len(load_image(file_path).tobytes()) * 8)
+
+            encryptedImage = load_image(file_path)
+            decryptedImage = cipher.decrypt_image(encryptedImage, keystream,istext=False)
+            display_image(decryptedImage, "Decrypted image")
+        else:
+            selected_cipher = self.cipher_combobox.currentData()
+            mode = self.mode_combobox.currentData()
+            """if mode != DES.MODE_CBC and mode != DES.MODE_ECB:
+                print('Only CBC and ECB mode supported...')
+                sys.exit()"""
+
+            file_path, _ = QFileDialog.getOpenFileName()
+            if not file_path:
+                return
+
+            encryptedImage = load_image(file_path)
+
+            decryptedImage = decrypt_image(encryptedImage, key, mode,selected_cipher)
+            display_image(decryptedImage,"Decrypted image")
 
     def toggle_theme(self):
         global current_stylesheet
