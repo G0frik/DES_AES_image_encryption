@@ -413,7 +413,7 @@ class MyApp(QtWidgets.QWidget):
 
 
         elif 'dark' == current_stylesheet:
-            print(current_stylesheet, "Nofuck123")
+
             print(self.styleSheet())
             # Switch to the light theme
             print(self.default_stylesheet)

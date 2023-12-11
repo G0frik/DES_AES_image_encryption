@@ -3,7 +3,7 @@ import time
 import re
 import cv2
 import numpy as np
-from math import gcd
+from math import gcd,lcm
 
 class BBS_Stream_Cipher:
     def __init__(self, p, q, seed):
@@ -141,7 +141,7 @@ class BBS_Stream_Cipher:
             ciphertext, _ = BBS_Stream_Cipher.encrypt(imageBytes, keystream, istext=True)
         else:
             ciphertext = BBS_Stream_Cipher.encrypt(imageBytes, keystream, istext=False)
-
+        print(image.dtype)
         encryptedImage = np.frombuffer(bytes(ciphertext), dtype=image.dtype).reshape(image.shape)
 
         return encryptedImage
@@ -173,9 +173,13 @@ class BBS_Stream_Cipher:
         cv2.waitKey()
 
 
+
+
 if __name__ == '__main__':
-    p, q, seed = 13, 11, 100
+    p, q, seed = 19, 11, 100
     bbs = BBS_Stream_Cipher(p, q, seed)
+    ptest,qtest,seedtest=BBS_Stream_Cipher.find_prime_congruent_number_x0()
+
 
     plaintext = "Hello, world"
     keystream = bbs.blum_blum_shub_generator(num_bits=len(plaintext) * 8)
