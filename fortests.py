@@ -1,7 +1,7 @@
 import numpy as np
 import random
 from math import gcd
-
+import math
 
 def str_to_binary(string):
     # Initialize empty list to store binary values
@@ -64,25 +64,29 @@ def find_prime_congruent_number_x0():
                 print("seed and p*q are not coprime")
                 seed = random.randint(2, n)
             return p, q, seed
-def BGW_enc(p, q, x, m):
-    m= str_to_binary(m)
-    n = p * q
+def BGW_enc(n, x, m):
+    #m= str_to_binary(m)
     gcd,a,b=gcdExtended(p,q)
-    assert a * p + b * q == 1
-    assert p%4 == 3 and q%4 == 3
+    #assert a * p + b * q == 1
+    #assert p%4 == 3 and q%4 == 3
 
-    k = int(np.log2(n))
-    h = int(np.log2(k))
-    print("k:", k, "h:", h)
+
+    h = round(math.log2(math.log2(n)))
+    print(h)
+    print("h:", h)
     t = len(m) // h
     print("t:",t)
-    xi = x
+    xi = (x ** 2) % n
     c = ''
     for i in range(t):
         mi = m[i * h:(i + 1) * h]
+
+        print("m:",m,"mi:",mi)
         xi = (xi ** 2) % n
         xi_bin = bin(xi)
+        print("xi:",xi,"xi_bin:",xi_bin)
         pi = xi_bin[-h:]
+        print("pi:",pi)
 
         mi_int = int(mi, 2)
         pi_int = int(pi, 2)
@@ -90,6 +94,7 @@ def BGW_enc(p, q, x, m):
         ci = pi_int ^ mi_int
         ci_bin = format(ci, '0' + str(h) + 'b')
         c += ci_bin
+        print(f"x{i}:{xi}")
 
     xt = (xi ** 2) % n
     return c, xt
@@ -98,10 +103,10 @@ def BGW_enc(p, q, x, m):
 def BGW_dec(p, q, xt, c):
     n = p * q
     gcd, a, b = gcdExtended(p, q)
-    k = int(np.log2(n))
-    h = int(np.log2(k))
+    h = round(math.log2(math.log2(n)))
 
     t = len(c) // h
+    print(h,t)
 
     d1 = (((p + 1) // 4) ** (t + 1)) % (p - 1)
     d2 = (((q + 1) // 4) ** (t + 1)) % (q - 1)
@@ -112,22 +117,26 @@ def BGW_dec(p, q, xt, c):
     v = (xt ** d2) % q
 
     x0 = (v * a * p + u * b * q) % n
-
+    print("decrypted x0:",x0)
     xi = x0
+    print("xt:",xt,"d1:",d1,"d2:",d2,"u:", u,"v:", v,"x0:", x0,"xi:", xi)
     m = ''
     for i in range(t):
         ci = c[i * h:(i + 1) * h]
         xi = (xi ** 2) % n
+        #print("xi:",xi,"ci:",ci)
         xi_bin = bin(xi)
         pi = xi_bin[-h:]
         ci_int = int(ci, 2)
         pi_int = int(pi, 2)
 
+        print("xid:",xi,"xi_bind:",xi_bin)
+        print("cid:",ci,"pid:",pi)
         mi = pi_int ^ ci_int
         mi_bin = format(mi, '0' + str(h) + 'b')
         m += mi_bin
 
-    return binary_to_str(m)
+    return m
 
 
 def gcdExtended(a, b):
@@ -148,16 +157,25 @@ def gcdExtended(a, b):
 
 
 if __name__ == "__main__":
-    m = 'hello'
+    m = '101001'
 
-    p = 499
-    q = 547
-    x0 = 159201
+    p = 19
+    q = 7
+    n=p*q
+    x0 = 36
 
-    c, xt = BGW_enc(p, q,x0, m)
+    c, xt = BGW_enc(n,x0, m)
     print("ciphertext:", c)
     d = BGW_dec(p, q, xt, c)
     print("decrypted plaintext:", d, "plaintext:", m)
     print("asserting that decrypted plaintext == m...")
     assert m == d
     print("assertion correct! done.")
+
+
+import math
+
+n = 133
+h = math.log2(math.log2(n))
+
+print(h)
