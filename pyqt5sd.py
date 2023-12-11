@@ -272,16 +272,19 @@ class MyApp(QtWidgets.QWidget):
             print("Cipher and mode must be selected.")
             return
 
-        file_path, _ = QFileDialog.getOpenFileName()
-        if not file_path:
-            return
 
-        imageOrig = load_image(file_path)
-        display_image(imageOrig, "Original image")
+
 
         if selected_cipher == BBS_Stream_Cipher:
             #p, q, seed = BBS_Stream_Cipher.find_prime_congruent_number_x0()
-            p,q,seed=11,13,100
+            file_path, _ = QFileDialog.getOpenFileName()
+            print(file_path)
+            if not file_path:
+                return
+            print(file_path, "file path")
+            imageOrig = load_image(file_path)
+            print(imageOrig)
+            display_image(imageOrig, "Original image")
 
             p_str = self.p_entry.text()
             q_str = self.q_entry.text()
@@ -319,9 +322,11 @@ class MyApp(QtWidgets.QWidget):
             print(file_path)
             if not file_path:
                 return
-
+            print(file_path, "file path")
             imageOrig = load_image(file_path)
+            print(imageOrig)
             display_image(imageOrig, "Original image")
+
 
             encryptedImage = encrypt_image(imageOrig, key, mode,selected_cipher)
 
@@ -342,13 +347,12 @@ class MyApp(QtWidgets.QWidget):
             print("Cipher and mode must be selected.")
             return
 
-        file_path, _ = QFileDialog.getOpenFileName()
-        if not file_path:
-            return
+
 
         if selected_cipher == BBS_Stream_Cipher:
-            p, q, seed = BBS_Stream_Cipher.find_prime_congruent_number_x0()
-            p, q, seed = 11, 13, 100
+
+            #p, q, seed = BBS_Stream_Cipher.find_prime_congruent_number_x0()
+
             p_str = self.p_entry.text()
             q_str = self.q_entry.text()
             seed_str = self.seed_entry.text()
@@ -361,6 +365,9 @@ class MyApp(QtWidgets.QWidget):
                 print("Invalid input for p, q, or seed. Please enter valid integers.")
                 return
             print(p,q,seed)
+            file_path, _ = QFileDialog.getOpenFileName()
+            if not file_path:
+                return
             cipher = BBS_Stream_Cipher(p, q, seed)
             keystream = cipher.blum_blum_shub_generator(len(load_image(file_path).tobytes()) * 8)
 
