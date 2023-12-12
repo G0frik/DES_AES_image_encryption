@@ -12,6 +12,7 @@ from bbs_class import BBS_Stream_Cipher
 from blum_goldwasser import BGWCryptosystem
 from math import gcd
 import qdarkstyle
+import datetime
 global key
 global current_stylesheet
 current_stylesheet = "dark"
@@ -70,6 +71,9 @@ class MyApp(QtWidgets.QWidget):
         self.xt_blum_goldwasser_label = QLabel("Enter x_t:")
         self.xt_blum_goldwasser_entry = QLineEdit()
         self.generate_blum_goldwasser_values_button = QPushButton("Generate p, q, seed for Blum-Goldwasser")
+        self.read_private_key_button = QPushButton("Read Private Key from File")
+        self.read_public_key_button = QPushButton("Read Public Key from File")
+
         self.p_label = QLabel("Enter p:")
         self.p_entry = QLineEdit()
         self.q_label = QLabel("Enter q:")
@@ -89,6 +93,7 @@ class MyApp(QtWidgets.QWidget):
         self.plaintext_entry = QLineEdit()
         self.encrypt_blum_goldwasser_button = QPushButton("Encrypt")
         self.decrypt_blum_goldwasser_button = QPushButton("Decrypt")
+        self.decrypt_from_file_button = QPushButton("Decrypt from File")
         self.result_label = QLabel("Result:")
 
         self.cipher_label= QLabel("Selected Cipher: None")
@@ -134,6 +139,8 @@ class MyApp(QtWidgets.QWidget):
         vbox_left.addWidget(self.xt_blum_goldwasser_label)
         vbox_left.addWidget(self.xt_blum_goldwasser_entry)
         vbox_left.addWidget(self.generate_blum_goldwasser_values_button)
+        vbox_left.addWidget(self.read_private_key_button)
+        vbox_left.addWidget(self.read_public_key_button)
         vbox_left.addWidget(self.p_label)
         vbox_left.addWidget(self.p_entry)
         vbox_left.addWidget(self.q_label)
@@ -163,6 +170,7 @@ class MyApp(QtWidgets.QWidget):
         vbox_right.addWidget(self.plaintext_entry)
         vbox_right.addWidget(self.encrypt_blum_goldwasser_button)
         vbox_right.addWidget(self.decrypt_blum_goldwasser_button)
+        vbox_right.addWidget(self.decrypt_from_file_button)
         vbox_right.addWidget(self.result_label)
         vbox_right.addWidget(self.separator)
 
@@ -188,7 +196,13 @@ class MyApp(QtWidgets.QWidget):
         self.encrypt_blum_goldwasser_button.clicked.connect(self.encrypt_blum_goldwasser)
         self.decrypt_blum_goldwasser_button.clicked.connect(self.decrypt_blum_goldwasser)
         self.generate_blum_goldwasser_values_button.clicked.connect(self.generate_random_blum_goldwasser_values)
-
+        self.read_private_key_button.clicked.connect(self.read_private_key_from_file)
+        self.read_public_key_button.clicked.connect(self.read_public_key_from_file)
+        self.n_blum_goldwasser_entry.textChanged.connect(self.update_h_label)
+        self.p_blum_goldwasser_entry.textChanged.connect(self.update_n_label)
+        self.q_blum_goldwasser_entry.textChanged.connect(self.update_n_label)
+        self.decrypt_from_file_button.clicked.connect(self.decrypt_from_file_blum_goldwasser)
+        #BBS
         self.generate_bbs_values_button.clicked.connect(self.generate_random_bbs_values)
         self.set_key_button.clicked.connect(self.set_key)
         self.generate_key_button.clicked.connect(self.generate_random_key)
@@ -201,10 +215,9 @@ class MyApp(QtWidgets.QWidget):
         self.theme_toggle_button.clicked.connect(self.toggle_theme)
         self.cipher_combobox.currentIndexChanged.connect(self.update_mode_combobox)
 
-        self.n_blum_goldwasser_entry.textChanged.connect(self.update_h_label)
-        self.p_blum_goldwasser_entry.textChanged.connect(self.update_n_label)
-        self.q_blum_goldwasser_entry.textChanged.connect(self.update_n_label)
+
         self.update_mode_combobox()
+
 
     def update_h_label(self):
         n_str = self.n_blum_goldwasser_entry.text()
@@ -237,9 +250,13 @@ class MyApp(QtWidgets.QWidget):
             n_str = int(self.p_blum_goldwasser_entry.text()) * int(self.q_blum_goldwasser_entry.text())
         x0_str = self.x0_blum_goldwasser_entry.text()
         plaintext = self.plaintext_entry.text()
+        result_text,xt = self.blum_goldwasser.encrypt(int(n_str),int(x0_str),plaintext)
+        self.result_label.setText(f"Encrypted message: {result_text} xt={xt}")
 
-        result_text = self.blum_goldwasser.encrypt(int(n_str),int(x0_str),plaintext)
-        self.result_label.setText(f"Encrypted message: {result_text}")
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        filename = f"encrypt_result_{timestamp}.txt"
+        with open(f"blum-goldwasser_results\\{filename}", "w") as file:
+            file.write(f"encrypted={result_text}\nxt={xt}")
 
     def decrypt_blum_goldwasser(self):
         p_str = int(self.p_blum_goldwasser_entry.text())
@@ -250,6 +267,30 @@ class MyApp(QtWidgets.QWidget):
         result_text = self.blum_goldwasser.decrypt(p_str, q_str, xt_str, ciphertext)
         self.result_label.setText(f"Decrypted message: {result_text}")
 
+    def decrypt_from_file_blum_goldwasser(self):
+        encrypted_filename, _ = QFileDialog.getOpenFileName(filter="Text files (*.txt)")
+        if encrypted_filename:
+            try:
+                with open(encrypted_filename, "r") as file:
+                    lines = file.readlines()
+                    encrypted_text = lines[0].split("=")[1].strip()
+                    x_t_value = int(lines[1].split("=")[1].strip())
+
+                    # Update the corresponding QLineEdit widgets
+                    self.plaintext_entry.clear()# Clear the previous plaintext entry
+                    self.plaintext_entry.setText(encrypted_text)
+                    self.xt_blum_goldwasser_entry.setText(str(x_t_value))
+
+                    # Decrypt the message
+                    p_value = int(self.p_blum_goldwasser_entry.text())
+                    q_value = int(self.q_blum_goldwasser_entry.text())
+                    decrypted_text = self.blum_goldwasser.decrypt(p_value, q_value, x_t_value, encrypted_text)
+
+                    # Display the decrypted message
+                    self.result_label.setText(f"Decrypted message: {decrypted_text}")
+
+            except Exception as e:
+                print(f"Error decrypting from file: {str(e)}")
     def generate_random_bbs_values(self):
         p, q, seed = BBS_Stream_Cipher.find_prime_congruent_number_x0()
         self.p_entry.setText(str(p))
@@ -260,6 +301,14 @@ class MyApp(QtWidgets.QWidget):
         p, q, seed = BGWCryptosystem.find_prime_congruent_number_x0()
         n=p*q
         h_value = round(math.log2(math.log2(n)))
+        # Save p and q to a file with the current timestamp
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        filenameprivate = f"privatekey_{timestamp}.txt"
+        with open(f"blum-goldwasser_keys\\{filenameprivate}", "w") as file:
+            file.write(f"p={p}\nq={q}")
+        filenamepublic = f"publickey_{timestamp}.txt"
+        with open(f"blum-goldwasser_keys\\{filenamepublic}", "w") as file:
+            file.write(f"n={n}")
         self.p_blum_goldwasser_entry.setText(str(p))
         self.q_blum_goldwasser_entry.setText(str(q))
         self.x0_blum_goldwasser_entry.setText(str(seed))
@@ -301,6 +350,43 @@ class MyApp(QtWidgets.QWidget):
         cipher_var = self.cipher_combobox.itemData(index)
         self.cipher_label.setText(f"Selected Cipher: {cipher_names.get(cipher_var)}")
 
+    def read_private_key_from_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(filter="Text files (*.txt)")
+        if file_path:
+            try:
+                with open(file_path, "r") as file:
+                    lines = file.readlines()
+                    p_value = int(lines[0].split("=")[1])
+                    q_value = int(lines[1].split("=")[1])
+
+                    # Update the corresponding QLineEdit widgets
+                    self.p_blum_goldwasser_entry.setText(str(p_value))
+                    self.q_blum_goldwasser_entry.setText(str(q_value))
+
+                    # Calculate and set the value of n
+                    n_value = p_value * q_value
+                    self.n_blum_goldwasser_entry.setText(str(n_value))
+
+                    # Update the h label
+                    self.update_h_label()
+            except Exception as e:
+                print(f"Error reading private key: {str(e)}")
+
+    def read_public_key_from_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(filter="Text files (*.txt)")
+        if file_path:
+            try:
+                with open(file_path, "r") as file:
+                    lines = file.readlines()
+                    n_value = int(lines[0].split("=")[1])
+
+                    # Update the corresponding QLineEdit widget
+                    self.n_blum_goldwasser_entry.setText(str(n_value))
+
+                    # Update the h label
+                    self.update_h_label()
+            except Exception as e:
+                print(f"Error reading public key: {str(e)}")
     def set_key(self):
         global key
 

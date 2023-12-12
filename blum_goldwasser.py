@@ -33,7 +33,7 @@ class BGWCryptosystem:
 
             n = p * q
             log2_log2_n = round(math.log2(math.log2(n)))
-            print(log2_log2_n)
+            #print(log2_log2_n)
 
             if log2_log2_n in {2, 4, 8} and BGWCryptosystem.is_prime(p) and BGWCryptosystem.congruence_check(p) and BGWCryptosystem.is_prime(q) and BGWCryptosystem.congruence_check(q):
                 seed = random.randint(2, n)
@@ -84,7 +84,7 @@ class BGWCryptosystem:
         x0 = (v * a * p + u * b * q) % n
         xi = x0
         m = ''
-        print("im here")
+        print()
         for i in range(t):
 
             ci = c[i * h:(i + 1) * h]
@@ -96,7 +96,9 @@ class BGWCryptosystem:
             mi = pi_int ^ ci_int
             mi_bin = format(mi, '0' + str(h) + 'b')
             m += mi_bin
-
+        if h in {2, 4, 8}:
+            return BGWCryptosystem.binary_to_str(m)
+        else:
             return m
 
     def gcdExtended(self, a, b):
@@ -132,22 +134,4 @@ class BGWCryptosystem:
         return ''.join(char_list)
 
 
-# Example usage:
-p_value = 19
-q_value = 7
-
-
-message = "101101"
-
-bgw = BGWCryptosystem()
-
-bgw.find_prime_congruent_number_x0()
-# Encrypt
-plaintext = message
-x_value = 1234
-encrypted_text, xt_result = bgw.encrypt(p_value*q_value, x_value, plaintext)
-print(encrypted_text, xt_result)
-# Decrypt
-decrypted_text = bgw.decrypt(p_value, q_value, xt_result, encrypted_text)
-print(plaintext,decrypted_text)
 

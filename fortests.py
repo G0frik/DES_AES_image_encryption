@@ -64,11 +64,10 @@ def find_prime_congruent_number_x0():
 def BGW_enc(n, x, m):
     #m= str_to_binary(m)
 
-
+    print("\nENCRYPTING...\n\n")
 
 
     h = round(math.log2(math.log2(n)))
-    print(h)
     print("h:", h)
     t = len(m) // h
     if len(m) % h != 0:
@@ -77,29 +76,32 @@ def BGW_enc(n, x, m):
     xi = (x ** 2) % n
     c = ''
     for i in range(t):
+        print("Number of iteration:",i+1)
         mi = m[i * h:(i + 1) * h]
 
-        print("m:",m,"mi:",mi)
+        print("m:",m,f"m{i+1}:",mi)
         xi = (xi ** 2) % n
         xi_bin = bin(xi)
-        print("xi:",xi,"xi_bin:",xi_bin)
+        print(f"x{i+1}:",xi,"xi_bin:",xi_bin)
         pi = xi_bin[-h:]
-        print("pi:",pi)
+
 
         mi_int = int(mi, 2)
         pi_int = int(pi, 2)
 
         ci = pi_int ^ mi_int
+
         ci_bin = format(ci, '0' + str(h) + 'b')
+        print(f"m{i + 1}:",mi, f"p{i + 1}:", pi,  f"c{i + 1}:", ci_bin)
         c += ci_bin
-        print(f"x{i}:{xi}")
+        #print(f"x{i}:{xi}")
 
     xt = (xi ** 2) % n
     return c, xt
 
 
 def BGW_dec(p, q, xt, c):
-
+    print("\n\nDECRYPTING...\n\n")
     n = p * q
     gcd, a, b = gcdExtended(p, q)
 
@@ -109,7 +111,7 @@ def BGW_dec(p, q, xt, c):
     if len(c) % h != 0:
         raise ValueError("m is not a multiple of h")
     t = len(c) // h
-    print(h,t)
+    #print(h,t)
 
     d1 = (((p + 1) // 4) ** (t + 1)) % (p - 1)
     d2 = (((q + 1) // 4) ** (t + 1)) % (q - 1)
@@ -122,21 +124,27 @@ def BGW_dec(p, q, xt, c):
     x0 = (v * a * p + u * b * q) % n
     print("decrypted x0:",x0)
     xi = x0
-    print("xt:",xt,"d1:",d1,"d2:",d2,"u:", u,"v:", v,"x0:", x0,"xi:", xi)
+    print("xt:",xt,"d1:",d1,"d2:",d2,"u:", u,"v:", v,"x0:", x0,"x0:", xi)
     m = ''
     for i in range(t):
+        print("Number of iteration:",i+1)
         ci = c[i * h:(i + 1) * h]
         xi = (xi ** 2) % n
-        #print("xi:",xi,"ci:",ci)
+        print("c:",c,f"c{i+1}:",ci)
+
+
         xi_bin = bin(xi)
+
+        print(f"x{i+1}:",xi,"xi_bin:",xi_bin)
+
         pi = xi_bin[-h:]
         ci_int = int(ci, 2)
         pi_int = int(pi, 2)
 
-        print("xid:",xi,"xi_bind:",xi_bin)
-        print("cid:",ci,"pid:",pi)
+
         mi = pi_int ^ ci_int
         mi_bin = format(mi, '0' + str(h) + 'b')
+        print(f"c{i + 1}:",ci, f"p{i + 1}:", pi,  f"m{i + 1}:", mi_bin)
         m += mi_bin
 
     return m
@@ -170,16 +178,9 @@ if __name__ == "__main__":
     c, xt = BGW_enc(n,x0, m)
     print("ciphertext:", c)
     d = BGW_dec(p, q, xt, c)
-    print("decrypted plaintext:", d, "plaintext:", m)
+    print("\n\ndecrypted plaintext:", d, "plaintext:", m)
     print("asserting that decrypted plaintext == m...")
     assert m == d
     print("assertion correct! done.")
 
 
-import math
-
-n = 10
-h = math.log2(math.log2(n))
-
-print(h)
-print(find_prime_congruent_number_x0())
