@@ -13,7 +13,7 @@ class BBS_Stream_Cipher:
 
     @staticmethod
     def generate_random_odd():
-        number = random.randint(1, 2**31 - 1)
+        number = random.randint(1, 2**21 - 1)
         if number % 2 == 0:
             number += 1
         return number

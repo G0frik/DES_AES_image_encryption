@@ -24,10 +24,7 @@ def binary_to_str(binary_str):
     # Join the characters into a single string
     return ''.join(char_list)
 
-# Test with example input
-test_str = "GeeksforGeeks"
-print(binary_to_str(str_to_binary(test_str)),test_str)
-print()
+
 
 def generate_random_odd():
     number = random.randint(1, 2**31 - 1)
@@ -66,15 +63,16 @@ def find_prime_congruent_number_x0():
             return p, q, seed
 def BGW_enc(n, x, m):
     #m= str_to_binary(m)
-    gcd,a,b=gcdExtended(p,q)
-    #assert a * p + b * q == 1
-    #assert p%4 == 3 and q%4 == 3
+
+
 
 
     h = round(math.log2(math.log2(n)))
     print(h)
     print("h:", h)
     t = len(m) // h
+    if len(m) % h != 0:
+        raise ValueError("m is not a multiple of h")
     print("t:",t)
     xi = (x ** 2) % n
     c = ''
@@ -101,10 +99,15 @@ def BGW_enc(n, x, m):
 
 
 def BGW_dec(p, q, xt, c):
+
     n = p * q
     gcd, a, b = gcdExtended(p, q)
-    h = round(math.log2(math.log2(n)))
 
+    assert a * p + b * q == 1
+    assert p%4 == 3 and q%4 == 3
+    h = round(math.log2(math.log2(n)))
+    if len(c) % h != 0:
+        raise ValueError("m is not a multiple of h")
     t = len(c) // h
     print(h,t)
 
@@ -175,7 +178,8 @@ if __name__ == "__main__":
 
 import math
 
-n = 133
+n = 10
 h = math.log2(math.log2(n))
 
 print(h)
+print(find_prime_congruent_number_x0())

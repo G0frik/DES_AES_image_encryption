@@ -1,3 +1,4 @@
+import math
 import sys
 import cv2
 from Crypto.Cipher import DES,AES
@@ -8,6 +9,7 @@ from PyQt5.QtGui import QIcon,QPixmap
 from PyQt5.QtWidgets import QFileDialog, QComboBox, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout,QFrame
 from despycryprtodome import encrypt_image,decrypt_image,save_image,load_image,display_image
 from bbs_class import BBS_Stream_Cipher
+from blum_goldwasser import BGWCryptosystem
 from math import gcd
 import qdarkstyle
 global key
@@ -35,7 +37,7 @@ mode_aes_names={
 cipher_names={
     DES: "DES",
     AES: "AES",
-    BBS_Stream_Cipher: "BBS Stream Cipher",
+    BBS_Stream_Cipher: "BBS Stream Cipher"
 }
 
 
@@ -44,6 +46,7 @@ class MyApp(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         #self.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
+        self.blum_goldwasser = BGWCryptosystem()
 
         self.theme_toggle_button = QPushButton()
         self.theme_toggle_button.setObjectName("theme_toggle_button")
@@ -56,6 +59,17 @@ class MyApp(QtWidgets.QWidget):
         self.separator.setFrameShape(QFrame.VLine)
         self.separator.setFrameShadow(QFrame.Sunken)
 
+        self.p_blum_goldwasser_label = QLabel("Enter p:")
+        self.p_blum_goldwasser_entry = QLineEdit()
+        self.q_blum_goldwasser_label = QLabel("Enter q:")
+        self.q_blum_goldwasser_entry = QLineEdit()
+        self.n_blum_goldwasser_label = QLabel("Enter n:")
+        self.n_blum_goldwasser_entry = QLineEdit()
+        self.x0_blum_goldwasser_label = QLabel("Enter seed:")
+        self.x0_blum_goldwasser_entry = QLineEdit()
+        self.xt_blum_goldwasser_label = QLabel("Enter x_t:")
+        self.xt_blum_goldwasser_entry = QLineEdit()
+        self.generate_blum_goldwasser_values_button = QPushButton("Generate p, q, seed for Blum-Goldwasser")
         self.p_label = QLabel("Enter p:")
         self.p_entry = QLineEdit()
         self.q_label = QLabel("Enter q:")
@@ -70,6 +84,12 @@ class MyApp(QtWidgets.QWidget):
         self.save_key_button = QPushButton("Save Key to File")
         self.read_key_button = QPushButton("Read Key from File")
 
+        self.h_label = QLabel("h (block size):")
+        self.plaintext_label = QLabel("Enter message bits or encrypted bits:")
+        self.plaintext_entry = QLineEdit()
+        self.encrypt_blum_goldwasser_button = QPushButton("Encrypt")
+        self.decrypt_blum_goldwasser_button = QPushButton("Decrypt")
+        self.result_label = QLabel("Result:")
 
         self.cipher_label= QLabel("Selected Cipher: None")
         #self.cipher_label.setFixedHeight(10)
@@ -103,6 +123,17 @@ class MyApp(QtWidgets.QWidget):
         #vbox_right.setSpacing(10)  # Adjust the spacing as needed
 
         # Add widgets to left layout
+        vbox_left.addWidget(self.p_blum_goldwasser_label)
+        vbox_left.addWidget(self.p_blum_goldwasser_entry)
+        vbox_left.addWidget(self.q_blum_goldwasser_label)
+        vbox_left.addWidget(self.q_blum_goldwasser_entry)
+        vbox_left.addWidget(self.n_blum_goldwasser_label)
+        vbox_left.addWidget(self.n_blum_goldwasser_entry)
+        vbox_left.addWidget(self.x0_blum_goldwasser_label)
+        vbox_left.addWidget(self.x0_blum_goldwasser_entry)
+        vbox_left.addWidget(self.xt_blum_goldwasser_label)
+        vbox_left.addWidget(self.xt_blum_goldwasser_entry)
+        vbox_left.addWidget(self.generate_blum_goldwasser_values_button)
         vbox_left.addWidget(self.p_label)
         vbox_left.addWidget(self.p_entry)
         vbox_left.addWidget(self.q_label)
@@ -119,15 +150,29 @@ class MyApp(QtWidgets.QWidget):
 
         # Add widgets to right layout
         spacer = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        # Add widgets for Blum-Goldwasser cryptosystem
+
+
+
 
         vbox_right.addWidget(self.theme_toggle_button,alignment=Qt.AlignmentFlag.AlignRight)
         vbox_right.addSpacerItem(spacer)
+        vbox_right.addWidget(QLabel("Blum-Goldwasser Cryptosystem"))
+        vbox_right.addWidget(self.h_label)
+        vbox_right.addWidget(self.plaintext_label)
+        vbox_right.addWidget(self.plaintext_entry)
+        vbox_right.addWidget(self.encrypt_blum_goldwasser_button)
+        vbox_right.addWidget(self.decrypt_blum_goldwasser_button)
+        vbox_right.addWidget(self.result_label)
+        vbox_right.addWidget(self.separator)
+
         vbox_right.addWidget(self.cipher_label)
         vbox_right.addWidget(self.cipher_combobox)
         vbox_right.addWidget(self.mode_label)
         vbox_right.addWidget(self.mode_combobox)
         vbox_right.addWidget(self.encrypt_button)
         vbox_right.addWidget(self.decrypt_button)
+
 
         # Create a horizontal layout for the entire window
         hbox = QHBoxLayout()
@@ -139,6 +184,11 @@ class MyApp(QtWidgets.QWidget):
 
         # Set the horizontal layout as the main layout for your window
         self.setLayout(hbox)
+        #Blum-goldwasser
+        self.encrypt_blum_goldwasser_button.clicked.connect(self.encrypt_blum_goldwasser)
+        self.decrypt_blum_goldwasser_button.clicked.connect(self.decrypt_blum_goldwasser)
+        self.generate_blum_goldwasser_values_button.clicked.connect(self.generate_random_blum_goldwasser_values)
+
         self.generate_bbs_values_button.clicked.connect(self.generate_random_bbs_values)
         self.set_key_button.clicked.connect(self.set_key)
         self.generate_key_button.clicked.connect(self.generate_random_key)
@@ -151,13 +201,70 @@ class MyApp(QtWidgets.QWidget):
         self.theme_toggle_button.clicked.connect(self.toggle_theme)
         self.cipher_combobox.currentIndexChanged.connect(self.update_mode_combobox)
 
+        self.n_blum_goldwasser_entry.textChanged.connect(self.update_h_label)
+        self.p_blum_goldwasser_entry.textChanged.connect(self.update_n_label)
+        self.q_blum_goldwasser_entry.textChanged.connect(self.update_n_label)
         self.update_mode_combobox()
+
+    def update_h_label(self):
+        n_str = self.n_blum_goldwasser_entry.text()
+        if n_str:
+            try:
+                n = int(n_str)
+                h_value = round(math.log2(math.log2(n)))
+                self.h_label.setText(f"h (block size): {h_value}")
+            except ValueError:
+                # Handle the case when the input is not a valid integer
+                pass
+
+    def update_n_label(self):
+        p_str = self.p_blum_goldwasser_entry.text()
+        q_str = self.q_blum_goldwasser_entry.text()
+
+        if p_str and q_str:
+            try:
+                p = int(p_str)
+                q = int(q_str)
+                n_value = p * q
+                self.n_blum_goldwasser_entry.setText(str(n_value))
+                self.update_h_label()  # Update the h label as well
+            except ValueError:
+                # Handle the case when the input is not a valid integer
+                pass
+    def encrypt_blum_goldwasser(self):
+        n_str = self.n_blum_goldwasser_entry.text()
+        if n_str =='':
+            n_str = int(self.p_blum_goldwasser_entry.text()) * int(self.q_blum_goldwasser_entry.text())
+        x0_str = self.x0_blum_goldwasser_entry.text()
+        plaintext = self.plaintext_entry.text()
+
+        result_text = self.blum_goldwasser.encrypt(int(n_str),int(x0_str),plaintext)
+        self.result_label.setText(f"Encrypted message: {result_text}")
+
+    def decrypt_blum_goldwasser(self):
+        p_str = int(self.p_blum_goldwasser_entry.text())
+        q_str = int(self.q_blum_goldwasser_entry.text())
+        xt_str = int(self.xt_blum_goldwasser_entry.text())
+        ciphertext = self.plaintext_entry.text()
+
+        result_text = self.blum_goldwasser.decrypt(p_str, q_str, xt_str, ciphertext)
+        self.result_label.setText(f"Decrypted message: {result_text}")
 
     def generate_random_bbs_values(self):
         p, q, seed = BBS_Stream_Cipher.find_prime_congruent_number_x0()
         self.p_entry.setText(str(p))
         self.q_entry.setText(str(q))
         self.seed_entry.setText(str(seed))
+
+    def generate_random_blum_goldwasser_values(self):
+        p, q, seed = BGWCryptosystem.find_prime_congruent_number_x0()
+        n=p*q
+        h_value = round(math.log2(math.log2(n)))
+        self.p_blum_goldwasser_entry.setText(str(p))
+        self.q_blum_goldwasser_entry.setText(str(q))
+        self.x0_blum_goldwasser_entry.setText(str(seed))
+        self.n_blum_goldwasser_entry.setText(str(n))
+        self.h_label.setText(f"h (block size): {h_value}")
 
     def update_mode_combobox(self):
         selected_cipher = self.cipher_combobox.currentData()
@@ -473,6 +580,6 @@ if __name__ == '__main__':
     app.setStyle("Fusion")  # Optional: Use the Fusion style for a more modern look
     window = MyApp()
     window.setWindowTitle("Image Encryption/Decryption")
-    window.setGeometry(100,100,800, 400)  # Adjust the window size
+    window.setGeometry(100,100,800, 600)  # Adjust the window size
     window.show()
     sys.exit(app.exec_())
