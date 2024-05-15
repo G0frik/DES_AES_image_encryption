@@ -20,20 +20,13 @@ current_stylesheet = "dark"
 mode_des_names = {
     DES.MODE_CBC: "CBC",
     DES.MODE_ECB: "ECB",
+    DES.MODE_CTR: "CTR",
 }
 
 mode_aes_names={
     AES.MODE_ECB: "ECB",
     AES.MODE_CBC: "CBC",
-    AES.MODE_OFB: "OFB",
-    AES.MODE_CFB: "CFB",
     AES.MODE_CTR: "CTR",
-    AES.MODE_CCM: "CCM",
-    AES.MODE_EAX: "EAX",
-    AES.MODE_GCM: "GCM",
-    AES.MODE_SIV: "SIV",
-    AES.MODE_OCB: "OCB",
-    AES.MODE_OPENPGP: "OPENPGP",
 }
 cipher_names={
     DES: "DES",
