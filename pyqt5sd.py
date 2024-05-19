@@ -6,7 +6,8 @@ from Crypto.Random import get_random_bytes
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon,QPixmap
-from PyQt5.QtWidgets import QFileDialog, QComboBox, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout,QFrame
+from PyQt5.QtWidgets import QFileDialog, QComboBox, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QFrame, \
+    QApplication, QMessageBox
 from despycryprtodome import encrypt_image,decrypt_image,save_image,load_image,display_image
 from bbs_class import BBS_Stream_Cipher
 from blum_goldwasser import BGWCryptosystem
@@ -27,6 +28,7 @@ mode_aes_names={
     AES.MODE_ECB: "ECB",
     AES.MODE_CBC: "CBC",
     AES.MODE_CTR: "CTR",
+    AES.MODE_GCM: "GCM",
 }
 cipher_names={
     DES: "DES",
@@ -35,7 +37,12 @@ cipher_names={
 }
 
 
-
+def show_alert(message):
+    msg = QMessageBox()
+    msg.setIcon(QMessageBox.Critical)
+    msg.setText(message)
+    msg.setWindowTitle("Error")
+    msg.exec_()
 class MyApp(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
@@ -106,6 +113,7 @@ class MyApp(QtWidgets.QWidget):
         self.default_stylesheet = self.styleSheet()
 
         self.init_ui()
+
 
     def init_ui(self):
         # Create layouts for left and right sections
@@ -572,9 +580,16 @@ class MyApp(QtWidgets.QWidget):
                 return
 
             encryptedImage = load_image(file_path)
+            try:
+                decryptedImage = decrypt_image(encryptedImage, key, mode,selected_cipher)
+            except ValueError as e:
+                show_alert(f"Decryption failed: {str(e)}")
+                return None
+            if decryptedImage is None:
+                print("Decryption failed. Please check the key and mode.")
+            else:
+                display_image(decryptedImage,"Decrypted image")
 
-            decryptedImage = decrypt_image(encryptedImage, key, mode,selected_cipher)
-            display_image(decryptedImage,"Decrypted image")
 
     def toggle_theme(self):
         global current_stylesheet
