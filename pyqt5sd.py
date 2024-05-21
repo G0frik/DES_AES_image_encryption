@@ -1,19 +1,22 @@
 import math
+import os
 import sys
 import cv2
 from Crypto.Cipher import DES,AES
 from Crypto.Random import get_random_bytes
+from Crypto.PublicKey import RSA
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon,QPixmap
 from PyQt5.QtWidgets import QFileDialog, QComboBox, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QFrame, \
-    QApplication, QMessageBox
+    QApplication, QMessageBox, QCheckBox
 from despycryprtodome import encrypt_image,decrypt_image,save_image,load_image,display_image
 from bbs_class import BBS_Stream_Cipher
 from blum_goldwasser import BGWCryptosystem
 from math import gcd
 import qdarkstyle
 import datetime
+
 global key
 global current_stylesheet
 current_stylesheet = "dark"
@@ -21,7 +24,6 @@ current_stylesheet = "dark"
 mode_des_names = {
     DES.MODE_CBC: "CBC",
     DES.MODE_ECB: "ECB",
-    DES.MODE_CTR: "CTR",
 }
 
 mode_aes_names={
@@ -33,7 +35,7 @@ mode_aes_names={
 cipher_names={
     DES: "DES",
     AES: "AES",
-    BBS_Stream_Cipher: "BBS Stream Cipher"
+    #BBS_Stream_Cipher: "BBS Stream Cipher"
 }
 
 
@@ -46,6 +48,9 @@ def show_alert(message):
 class MyApp(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
+        self.use_rsa_encryption = False
+        self.rsa_public_key = None
+        self.rsa_private_key = None
         #self.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
         self.blum_goldwasser = BGWCryptosystem()
 
@@ -59,7 +64,7 @@ class MyApp(QtWidgets.QWidget):
         self.separator = QFrame()
         self.separator.setFrameShape(QFrame.VLine)
         self.separator.setFrameShadow(QFrame.Sunken)
-
+        """
         self.p_blum_goldwasser_label = QLabel("Enter p:")
         self.p_blum_goldwasser_entry = QLineEdit()
         self.q_blum_goldwasser_label = QLabel("Enter q:")
@@ -70,24 +75,29 @@ class MyApp(QtWidgets.QWidget):
         self.x0_blum_goldwasser_entry = QLineEdit()
         self.xt_blum_goldwasser_label = QLabel("Enter x_t:")
         self.xt_blum_goldwasser_entry = QLineEdit()
-        self.generate_blum_goldwasser_values_button = QPushButton("Generate p, q, seed for Blum-Goldwasser")
+        """
+        self.rsa_checkbox = QCheckBox("Use RSA Encryption")
+        self.rsa_key_status_label = QLabel("RSA key status:")
+        self.rsa_key_status_entry = QLineEdit()
+
+        self.generate_rsa_keys_button = QPushButton("Generate RSA pair of keys and save to files")
         self.read_private_key_button = QPushButton("Read Private Key from File")
         self.read_public_key_button = QPushButton("Read Public Key from File")
-
+        """
         self.p_label = QLabel("Enter p:")
         self.p_entry = QLineEdit()
         self.q_label = QLabel("Enter q:")
         self.q_entry = QLineEdit()
         self.seed_label = QLabel("Enter seed:")
         self.seed_entry = QLineEdit()
-        self.generate_bbs_values_button = QPushButton("Generate p, q, seed for BBS")
+        self.generate_bbs_values_button = QPushButton("Generate p, q, seed for BBS")"""
         self.key_label = QLabel("Enter Key:")
         self.key_entry = QLineEdit()
         self.set_key_button = QPushButton("Set Key")
         self.generate_key_button = QPushButton("Generate Random Key")
         self.save_key_button = QPushButton("Save Key to File")
         self.read_key_button = QPushButton("Read Key from File")
-
+        """
         self.h_label = QLabel("h (block size):")
         self.plaintext_label = QLabel("Enter message bits or encrypted bits:")
         self.plaintext_entry = QLineEdit()
@@ -95,7 +105,7 @@ class MyApp(QtWidgets.QWidget):
         self.decrypt_blum_goldwasser_button = QPushButton("Decrypt")
         self.decrypt_from_file_button = QPushButton("Decrypt from File")
         self.result_label = QLabel("Result:")
-
+        """
         self.cipher_label= QLabel("Selected Cipher: None")
         #self.cipher_label.setFixedHeight(10)
         self.cipher_combobox = QComboBox()
@@ -129,6 +139,7 @@ class MyApp(QtWidgets.QWidget):
         #vbox_right.setSpacing(10)  # Adjust the spacing as needed
 
         # Add widgets to left layout
+        """
         vbox_left.addWidget(self.p_blum_goldwasser_label)
         vbox_left.addWidget(self.p_blum_goldwasser_entry)
         vbox_left.addWidget(self.q_blum_goldwasser_label)
@@ -139,9 +150,13 @@ class MyApp(QtWidgets.QWidget):
         vbox_left.addWidget(self.x0_blum_goldwasser_entry)
         vbox_left.addWidget(self.xt_blum_goldwasser_label)
         vbox_left.addWidget(self.xt_blum_goldwasser_entry)
-        vbox_left.addWidget(self.generate_blum_goldwasser_values_button)
+        """
+        vbox_left.addWidget(self.rsa_key_status_label)
+        vbox_left.addWidget(self.rsa_key_status_entry)
+        vbox_left.addWidget(self.generate_rsa_keys_button)
         vbox_left.addWidget(self.read_private_key_button)
         vbox_left.addWidget(self.read_public_key_button)
+        """
         vbox_left.addWidget(self.p_label)
         vbox_left.addWidget(self.p_entry)
         vbox_left.addWidget(self.q_label)
@@ -149,7 +164,9 @@ class MyApp(QtWidgets.QWidget):
         vbox_left.addWidget(self.seed_label)
         vbox_left.addWidget(self.seed_entry)
         vbox_left.addWidget(self.generate_bbs_values_button)
+        """
         vbox_left.addWidget(self.key_label)
+        vbox_left.addWidget(self.rsa_checkbox)  # Add the checkbox to the layout
         vbox_left.addWidget(self.key_entry)
         vbox_left.addWidget(self.set_key_button)
         vbox_left.addWidget(self.generate_key_button)
@@ -165,7 +182,7 @@ class MyApp(QtWidgets.QWidget):
 
         vbox_right.addWidget(self.theme_toggle_button,alignment=Qt.AlignmentFlag.AlignRight)
         vbox_right.addSpacerItem(spacer)
-        vbox_right.addWidget(QLabel("Blum-Goldwasser Cryptosystem"))
+        """vbox_right.addWidget(QLabel("Blum-Goldwasser Cryptosystem"))
         vbox_right.addWidget(self.h_label)
         vbox_right.addWidget(self.plaintext_label)
         vbox_right.addWidget(self.plaintext_entry)
@@ -173,6 +190,7 @@ class MyApp(QtWidgets.QWidget):
         vbox_right.addWidget(self.decrypt_blum_goldwasser_button)
         vbox_right.addWidget(self.decrypt_from_file_button)
         vbox_right.addWidget(self.result_label)
+        """
         vbox_right.addWidget(self.separator)
 
         vbox_right.addWidget(self.cipher_label)
@@ -193,18 +211,19 @@ class MyApp(QtWidgets.QWidget):
 
         # Set the horizontal layout as the main layout for your window
         self.setLayout(hbox)
+        """
         #Blum-goldwasser
         self.encrypt_blum_goldwasser_button.clicked.connect(self.encrypt_blum_goldwasser)
         self.decrypt_blum_goldwasser_button.clicked.connect(self.decrypt_blum_goldwasser)
-        self.generate_blum_goldwasser_values_button.clicked.connect(self.generate_random_blum_goldwasser_values)
-        self.read_private_key_button.clicked.connect(self.read_private_key_from_file)
-        self.read_public_key_button.clicked.connect(self.read_public_key_from_file)
+
         self.n_blum_goldwasser_entry.textChanged.connect(self.update_h_label)
         self.p_blum_goldwasser_entry.textChanged.connect(self.update_n_label)
         self.q_blum_goldwasser_entry.textChanged.connect(self.update_n_label)
         self.decrypt_from_file_button.clicked.connect(self.decrypt_from_file_blum_goldwasser)
         #BBS
         self.generate_bbs_values_button.clicked.connect(self.generate_random_bbs_values)
+        """
+        #DES,AES
         self.set_key_button.clicked.connect(self.set_key)
         self.generate_key_button.clicked.connect(self.generate_random_key)
         self.save_key_button.clicked.connect(self.save_key_to_file)
@@ -213,14 +232,24 @@ class MyApp(QtWidgets.QWidget):
         self.cipher_combobox.currentIndexChanged.connect(self.set_cipher)
         self.encrypt_button.clicked.connect(self.encrypt_button_click)
         self.decrypt_button.clicked.connect(self.decrypt_button_click)
+
         self.theme_toggle_button.clicked.connect(self.toggle_theme)
         self.cipher_combobox.currentIndexChanged.connect(self.update_mode_combobox)
-
+        self.generate_rsa_keys_button.clicked.connect(self.generate_rsa_keys_values)
+        self.read_private_key_button.clicked.connect(self.read_private_key_from_file)
+        #self.read_public_key_button.clicked.connect(self.read_public_key_from_file)
+        self.read_public_key_button.clicked.connect(self.read_and_set_public_key)
+        self.rsa_checkbox.stateChanged.connect(self.toggle_rsa_encryption)
 
         self.update_mode_combobox()
 
+    def toggle_rsa_encryption(self, state):
+        # Update the flag based on the checkbox state
+        self.use_rsa_encryption = state == Qt.Checked
 
+    """
     def update_h_label(self):
+    
         n_str = self.n_blum_goldwasser_entry.text()
         if n_str:
             try:
@@ -297,24 +326,29 @@ class MyApp(QtWidgets.QWidget):
         self.p_entry.setText(str(p))
         self.q_entry.setText(str(q))
         self.seed_entry.setText(str(seed))
+    """
 
-    def generate_random_blum_goldwasser_values(self):
-        p, q, seed = BGWCryptosystem.find_prime_congruent_number_x0()
-        n=p*q
-        h_value = round(math.log2(math.log2(n)))
-        # Save p and q to a file with the current timestamp
+    def generate_rsa_keys_values(self):
+        # Generate a new RSA key pair
+        rsa_keys = RSA.generate(2048)
+
+        # Save the private key to a file
         timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-        filenameprivate = f"privatekey_{timestamp}.txt"
-        with open(f"blum-goldwasser_keys\\{filenameprivate}", "w") as file:
-            file.write(f"p={p}\nq={q}")
-        filenamepublic = f"publickey_{timestamp}.txt"
-        with open(f"blum-goldwasser_keys\\{filenamepublic}", "w") as file:
-            file.write(f"n={n}")
-        self.p_blum_goldwasser_entry.setText(str(p))
-        self.q_blum_goldwasser_entry.setText(str(q))
-        self.x0_blum_goldwasser_entry.setText(str(seed))
-        self.n_blum_goldwasser_entry.setText(str(n))
-        self.h_label.setText(f"h (block size): {h_value}")
+        filenameprivate = f"privatekey_{timestamp}.pem"
+
+        folder_path = "rsa_keys"
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+            print(f"Folder '{folder_path}' created successfully.")
+        with open(f"rsa_keys\\{filenameprivate}", "wb") as private_file:
+            private_file.write(rsa_keys.export_key("PEM"))
+
+        # Save the public key to a file
+        filenamepublic = f"publickey_{timestamp}.pem"
+        with open(f"rsa_keys\\{filenamepublic}", "wb") as public_file:
+            public_file.write(rsa_keys.publickey().export_key("PEM"))
+
+        self.rsa_key_status_entry.setText("Keys were generated and saved to files")
 
     def update_mode_combobox(self):
         selected_cipher = self.cipher_combobox.currentData()
@@ -352,42 +386,31 @@ class MyApp(QtWidgets.QWidget):
         self.cipher_label.setText(f"Selected Cipher: {cipher_names.get(cipher_var)}")
 
     def read_private_key_from_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(filter="Text files (*.txt)")
+        file_path, _ = QFileDialog.getOpenFileName(filter="PEM files (*.pem)")
         if file_path:
             try:
-                with open(file_path, "r") as file:
-                    lines = file.readlines()
-                    p_value = int(lines[0].split("=")[1])
-                    q_value = int(lines[1].split("=")[1])
-
-                    # Update the corresponding QLineEdit widgets
-                    self.p_blum_goldwasser_entry.setText(str(p_value))
-                    self.q_blum_goldwasser_entry.setText(str(q_value))
-
-                    # Calculate and set the value of n
-                    n_value = p_value * q_value
-                    self.n_blum_goldwasser_entry.setText(str(n_value))
-
-                    # Update the h label
-                    self.update_h_label()
+                with open(file_path, "rb") as file:
+                    private_key = RSA.import_key(file.read())
+                    self.rsa_key_status_entry.setText("Private key loaded successfully")
+                return private_key
             except Exception as e:
                 print(f"Error reading private key: {str(e)}")
 
     def read_public_key_from_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(filter="Text files (*.txt)")
+        file_path, _ = QFileDialog.getOpenFileName(filter="PEM files (*.pem)")
         if file_path:
             try:
-                with open(file_path, "r") as file:
-                    lines = file.readlines()
-                    n_value = int(lines[0].split("=")[1])
-
-                    # Update the corresponding QLineEdit widget
-                    self.n_blum_goldwasser_entry.setText(str(n_value))
-
-                    # Update the h label
-                    self.update_h_label()
+                with open(file_path, "rb") as file:
+                    public_key = RSA.import_key(file.read())
+                    self.rsa_key_status_entry.setText("Public key loaded successfully")
+                return public_key
             except Exception as e:
                 print(f"Error reading public key: {str(e)}")
+
+    def read_and_set_public_key(self):
+        self.rsa_public_key = self.read_public_key_from_file()
+
+
     def set_key(self):
         global key
 
@@ -468,7 +491,7 @@ class MyApp(QtWidgets.QWidget):
 
 
 
-
+        """
         if selected_cipher == BBS_Stream_Cipher:
             #p, q, seed = BBS_Stream_Cipher.find_prime_congruent_number_x0()
             file_path, _ = QFileDialog.getOpenFileName()
@@ -503,33 +526,36 @@ class MyApp(QtWidgets.QWidget):
             display_image(encryptedImage, "Encrypted image")
             encrypted_filename = f'{cipher_names.get(selected_cipher, "unknown")}_encrypted_{file_path.split("/")[-1]}.bmp'
             save_image(encryptedImage, encrypted_filename)
+            """
+
+        mode = self.mode_combobox.currentData()
+        selected_cipher=self.cipher_combobox.currentData()
+        print(mode)
+        print(selected_cipher)
+        """if mode != DES.MODE_CBC and mode != DES.MODE_ECB:
+            print('Only CBC and ECB mode supported...')
+            sys.exit()"""
+
+        file_path, _ = QFileDialog.getOpenFileName()
+        print(file_path)
+        if not file_path:
+            return
+        print(file_path, "file path")
+        imageOrig = load_image(file_path)
+        print(imageOrig)
+        display_image(imageOrig, "Original image")
+
+        if self.use_rsa_encryption:
+            encryptedImage = encrypt_image(imageOrig, key, mode, selected_cipher, self.rsa_public_key)
         else:
-            mode = self.mode_combobox.currentData()
-            selected_cipher=self.cipher_combobox.currentData()
-            print(mode)
-            print(selected_cipher)
-            """if mode != DES.MODE_CBC and mode != DES.MODE_ECB:
-                print('Only CBC and ECB mode supported...')
-                sys.exit()"""
+            encryptedImage = encrypt_image(imageOrig, key, mode, selected_cipher)
 
-            file_path, _ = QFileDialog.getOpenFileName()
-            print(file_path)
-            if not file_path:
-                return
-            print(file_path, "file path")
-            imageOrig = load_image(file_path)
-            print(imageOrig)
-            display_image(imageOrig, "Original image")
-
-
-            encryptedImage = encrypt_image(imageOrig, key, mode,selected_cipher)
-
-            # Display encrypted image (consider using QLabel to display images in PyQt)
-            # display_image(encryptedImage, "Encrypted image")
-            display_image(encryptedImage,"Encrypted image")
-            encrypted_filename = f'{cipher_names.get(selected_cipher, "unknown")}_{mode_des_names.get(mode, "unknown")}_encrypted_{file_path.split("/")[-1]}.bmp'
-            print(encrypted_filename)
-            save_image(encryptedImage, encrypted_filename)
+        # Display encrypted image (consider using QLabel to display images in PyQt)
+        # display_image(encryptedImage, "Encrypted image")
+        display_image(encryptedImage,"Encrypted image")
+        encrypted_filename = f'{cipher_names.get(selected_cipher, "unknown")}_{mode_aes_names.get(mode, "unknown")}_encrypted_{file_path.split("/")[-1]}.bmp'
+        print(encrypted_filename)
+        save_image(encryptedImage, encrypted_filename)
 
 
     def decrypt_button_click(self):
@@ -542,7 +568,7 @@ class MyApp(QtWidgets.QWidget):
             return
 
 
-
+        """
         if selected_cipher == BBS_Stream_Cipher:
 
             #p, q, seed = BBS_Stream_Cipher.find_prime_congruent_number_x0()
@@ -568,27 +594,27 @@ class MyApp(QtWidgets.QWidget):
             encryptedImage = load_image(file_path)
             decryptedImage = cipher.decrypt_image(encryptedImage, keystream,istext=False)
             display_image(decryptedImage, "Decrypted image")
+            """
+        selected_cipher = self.cipher_combobox.currentData()
+        mode = self.mode_combobox.currentData()
+        """if mode != DES.MODE_CBC and mode != DES.MODE_ECB:
+            print('Only CBC and ECB mode supported...')
+            sys.exit()"""
+
+        file_path, _ = QFileDialog.getOpenFileName()
+        if not file_path:
+            return
+
+        encryptedImage = load_image(file_path)
+        try:
+            decryptedImage = decrypt_image(encryptedImage, key, mode,selected_cipher)
+        except ValueError as e:
+            show_alert(f"Decryption failed: {str(e)}")
+            return None
+        if decryptedImage is None:
+            print("Decryption failed. Please check the key and mode.")
         else:
-            selected_cipher = self.cipher_combobox.currentData()
-            mode = self.mode_combobox.currentData()
-            """if mode != DES.MODE_CBC and mode != DES.MODE_ECB:
-                print('Only CBC and ECB mode supported...')
-                sys.exit()"""
-
-            file_path, _ = QFileDialog.getOpenFileName()
-            if not file_path:
-                return
-
-            encryptedImage = load_image(file_path)
-            try:
-                decryptedImage = decrypt_image(encryptedImage, key, mode,selected_cipher)
-            except ValueError as e:
-                show_alert(f"Decryption failed: {str(e)}")
-                return None
-            if decryptedImage is None:
-                print("Decryption failed. Please check the key and mode.")
-            else:
-                display_image(decryptedImage,"Decrypted image")
+            display_image(decryptedImage,"Decrypted image")
 
 
     def toggle_theme(self):

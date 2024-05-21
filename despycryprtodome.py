@@ -1,10 +1,11 @@
 import sys
 import cv2
 import numpy as np
-from Crypto.Cipher import DES,AES
+from Crypto.Cipher import DES, AES, PKCS1_OAEP
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
-from Crypto.Util import Counter
+from Crypto.PublicKey import RSA
+
 
 def load_image(filename):
     return cv2.imread(filename)
@@ -12,7 +13,7 @@ def load_image(filename):
 def display_image(image, title):
     cv2.imshow(title, image)
     cv2.waitKey()
-def encrypt_image(image, key, mode, algorithm=DES):
+def encrypt_image(image, key, mode, algorithm,rsa_public_key=None):
     rowOrig, columnOrig, depthOrig = image.shape
 
     # Convert original image data to bytes
@@ -21,29 +22,17 @@ def encrypt_image(image, key, mode, algorithm=DES):
     # Determine block size based on the algorithm
 
     if algorithm == DES:
-        ivSize = DES.block_size if mode in [DES.MODE_CBC, DES.MODE_OFB, DES.MODE_CFB] else 0
+        ivSize = DES.block_size if mode in [DES.MODE_CBC] else 0
         iv=get_random_bytes(ivSize)
         if mode == DES.MODE_CBC:
             cipher = DES.new(key, DES.MODE_CBC, iv)
-        elif mode == DES.MODE_OFB:
-            cipher = DES.new(key, DES.MODE_OFB, iv)
-        elif mode == DES.MODE_CFB:
-            cipher = DES.new(key, DES.MODE_CFB, iv, segment_size=64)
-        elif mode == DES.MODE_CTR:
-            # For CTR mode, we need to specify a counter object
-            counter = Counter.new(DES.block_size * 8)
-            cipher = DES.new(key, DES.MODE_CTR, counter=counter)
         else:
             cipher = DES.new(key, DES.MODE_ECB)
     elif algorithm == AES:
-        ivSize = AES.block_size if mode in [AES.MODE_CBC, AES.MODE_OFB, AES.MODE_CFB] else 0
+        ivSize = AES.block_size if mode in [AES.MODE_CBC] else 0
         iv = get_random_bytes(ivSize)
         if mode == AES.MODE_CBC:
             cipher = AES.new(key, AES.MODE_CBC, iv)
-        elif mode == AES.MODE_OFB:
-            cipher = AES.new(key, AES.MODE_OFB, iv)
-        elif mode == AES.MODE_CFB:
-            cipher = AES.new(key, AES.MODE_CFB, iv)
         elif mode == AES.MODE_GCM:
             nonce = get_random_bytes(12)
             # Initialize the AES-GCM cipher with the key and nonce
@@ -59,28 +48,48 @@ def encrypt_image(image, key, mode, algorithm=DES):
             nonceSize = len(nonce)
             tagSize = len(tag)
             paddedSize = len(imageBytesPadded) - len(imageBytes)
+            rsa_key_size=256
             void = columnOrig * depthOrig - nonceSize - tagSize - paddedSize
-
-            # Combine nonce, ciphertext, tag, and void space into one buffer
-            nonceTagCiphertextVoid = nonce + tag + ciphertext   + bytes(void)
-
+            if rsa_public_key:
+                void = columnOrig * depthOrig - nonceSize - tagSize - paddedSize - rsa_key_size
+                rsa_cipher = PKCS1_OAEP.new(rsa_public_key)
+                encrypted_key = rsa_cipher.encrypt(key)
+                # Combine nonce, ciphertext, tag, and void space into one buffer
+                nonceTagKeyCiphertextVoid = nonce + tag + encrypted_key + ciphertext + bytes(void)
+                encryptedImage = np.frombuffer(nonceTagKeyCiphertextVoid, dtype=image.dtype).reshape(rowOrig + 1,
+                                                                                                  columnOrig,
+                                                                                                  depthOrig)
+            else:
+                nonceTagCiphertextVoid = nonce + tag + ciphertext + bytes(void)
+                encryptedImage = np.frombuffer(nonceTagCiphertextVoid, dtype=image.dtype).reshape(rowOrig + 1, columnOrig,
+                                                                                              depthOrig)
             # Convert the buffer to the encrypted image data format
-            encryptedImage = np.frombuffer(nonceTagCiphertextVoid, dtype=image.dtype).reshape(rowOrig + 1, columnOrig,
-                                                                             depthOrig)
+
             return encryptedImage
         elif mode == AES.MODE_CTR:
-            nonce = get_random_bytes(8)
+            nonce = get_random_bytes(12)
             # For CTR mode, we need to specify a counter object
             cipher = AES.new(key, AES.MODE_CTR, nonce=nonce)
             imageBytesPadded = pad(imageBytes, cipher.block_size)
             ciphertext = cipher.encrypt(imageBytesPadded)
-            nonceSize = 8
+            nonceSize = 12
             # Convert ciphertext bytes to encrypted image data
             paddedSize = len(imageBytesPadded) - len(imageBytes)
             void = columnOrig * depthOrig - nonceSize - paddedSize
-            nonceCiphertextVoid = nonce + ciphertext + bytes(void)
-            encryptedImage = np.frombuffer(nonceCiphertextVoid, dtype=image.dtype).reshape(rowOrig + 1, columnOrig,
-                                                                                        depthOrig)
+            rsa_key_size= 256
+            if rsa_public_key:
+                void = columnOrig * depthOrig - nonceSize  - paddedSize - rsa_key_size
+                rsa_cipher = PKCS1_OAEP.new(rsa_public_key)
+                encrypted_key = rsa_cipher.encrypt(key)
+                # Combine nonce, ciphertext, tag, and void space into one buffer
+                nonceKeyCiphertextVoid = nonce + encrypted_key + ciphertext + bytes(void)
+                encryptedImage = np.frombuffer(nonceKeyCiphertextVoid, dtype=image.dtype).reshape(rowOrig + 1,
+                                                                                                  columnOrig,
+                                                                                                  depthOrig)
+            else:
+                nonceCiphertextVoid = nonce + ciphertext + bytes(void)
+                encryptedImage = np.frombuffer(nonceCiphertextVoid, dtype=image.dtype).reshape(rowOrig + 1, columnOrig,
+                                                                                              depthOrig)
 
             return encryptedImage
         else:
@@ -95,15 +104,26 @@ def encrypt_image(image, key, mode, algorithm=DES):
     # Convert ciphertext bytes to encrypted image data
     paddedSize = len(imageBytesPadded) - len(imageBytes)
     void = columnOrig * depthOrig - ivSize - paddedSize
-    ivCiphertextVoid = iv + ciphertext + bytes(void)
-    encryptedImage = np.frombuffer(ivCiphertextVoid, dtype=image.dtype).reshape(rowOrig + 1, columnOrig, depthOrig)
+    rsa_key_size= 256
+    if rsa_public_key:
+        void = columnOrig * depthOrig - ivSize - paddedSize - rsa_key_size
+        rsa_cipher = PKCS1_OAEP.new(rsa_public_key)
+        encrypted_key = rsa_cipher.encrypt(key)
+        # Combine nonce, ciphertext, tag, and void space into one buffer
+        ivKeyCiphertextVoid = iv + encrypted_key + ciphertext + bytes(void)
+        encryptedImage = np.frombuffer(ivKeyCiphertextVoid, dtype=image.dtype).reshape(rowOrig + 1,
+                                                                                          columnOrig,
+                                                                                          depthOrig)
+    else:
+        ivCiphertextVoid = iv + ciphertext + bytes(void)
+        encryptedImage = np.frombuffer(ivCiphertextVoid, dtype=image.dtype).reshape(rowOrig + 1, columnOrig, depthOrig)
 
     return encryptedImage
 
 def save_image(image, filename):
     cv2.imwrite(filename, image)
 
-def decrypt_image(encrypted_image, key, mode, algorithm=DES):
+def decrypt_image(encrypted_image, key, mode, algorithm):
     rowEncrypted, columnOrig, depthOrig = encrypted_image.shape
     rowOrig = rowEncrypted - 1
     encryptedBytes = encrypted_image.tobytes()
@@ -117,14 +137,15 @@ def decrypt_image(encrypted_image, key, mode, algorithm=DES):
         raise ValueError("Unsupported algorithm")
 
     print(block_size)
-    nonceSize = 8 if mode in [algorithm.MODE_CTR] else 12 if mode in [algorithm.MODE_GCM] else 0
-    ivSize = block_size if mode in [algorithm.MODE_CBC, algorithm.MODE_OFB, algorithm.MODE_CFB] else 0
-    tagsize = 16 if mode in [algorithm.MODE_GCM] else 0
+
+    nonceSize = 12 if mode in [AES.MODE_CTR,AES.MODE_GCM] else 0
+    ivSize = block_size if mode in [algorithm.MODE_CBC] else 0
+    tagsize = 16 if mode in [AES.MODE_GCM] else 0
     iv = encryptedBytes[:ivSize]
 
     nonce=encryptedBytes[:nonceSize]
 
-    tag = encryptedBytes[nonceSize: nonceSize + 16] if mode in [algorithm.MODE_GCM] else None
+    tag = encryptedBytes[nonceSize: nonceSize + 16] if mode in [AES.MODE_GCM] else None
 
     print(ivSize)
 
@@ -134,14 +155,10 @@ def decrypt_image(encrypted_image, key, mode, algorithm=DES):
 
     if mode in [algorithm.MODE_CTR]:
         encrypted = encryptedBytes[nonceSize: nonceSize + imageOrigBytesSize + paddedSize]
-    elif mode in [algorithm.MODE_GCM]:
+    elif mode in [AES.MODE_GCM]:
         encrypted = encryptedBytes[nonceSize + tagsize: nonceSize + tagsize + imageOrigBytesSize + paddedSize]
     else:
         encrypted = encryptedBytes[ivSize: ivSize + imageOrigBytesSize + paddedSize]
-
-
-
-
 
     # Decrypt
     if mode == algorithm.MODE_CBC:
@@ -152,8 +169,8 @@ def decrypt_image(encrypted_image, key, mode, algorithm=DES):
         cipher = algorithm.new(key, algorithm.MODE_CFB, iv)
     elif mode == algorithm.MODE_CTR:
         cipher = algorithm.new(key, algorithm.MODE_CTR, nonce=nonce)
-    elif mode == algorithm.MODE_GCM:
-        cipher = algorithm.new(key, algorithm.MODE_GCM, nonce=nonce)
+    elif mode == AES.MODE_GCM:
+        cipher = algorithm.new(key, AES.MODE_GCM, nonce=nonce)
         try:
             decryptedImageBytesPadded = cipher.decrypt_and_verify(encrypted, tag)
             decryptedImageBytes = unpad(decryptedImageBytesPadded, block_size)
@@ -168,7 +185,7 @@ def decrypt_image(encrypted_image, key, mode, algorithm=DES):
     else:
         cipher = algorithm.new(key, algorithm.MODE_ECB)
 
-    if mode not in [algorithm.MODE_GCM]:
+    if mode not in [AES.MODE_GCM]:
 
         decryptedImageBytesPadded = cipher.decrypt(encrypted)
         decryptedImageBytes = unpad(decryptedImageBytesPadded, block_size)
