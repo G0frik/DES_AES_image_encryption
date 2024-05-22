@@ -236,8 +236,9 @@ class MyApp(QtWidgets.QWidget):
         self.theme_toggle_button.clicked.connect(self.toggle_theme)
         self.cipher_combobox.currentIndexChanged.connect(self.update_mode_combobox)
         self.generate_rsa_keys_button.clicked.connect(self.generate_rsa_keys_values)
-        self.read_private_key_button.clicked.connect(self.read_private_key_from_file)
-        #self.read_public_key_button.clicked.connect(self.read_public_key_from_file)
+        #self.read_private_key_button.clicked.connect(self.read_private_key_from_file)
+
+        self.read_private_key_button.clicked.connect(self.read_and_set_private_key)
         self.read_public_key_button.clicked.connect(self.read_and_set_public_key)
         self.rsa_checkbox.stateChanged.connect(self.toggle_rsa_encryption)
 
@@ -350,6 +351,34 @@ class MyApp(QtWidgets.QWidget):
 
         self.rsa_key_status_entry.setText("Keys were generated and saved to files")
 
+    def read_private_key_from_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(filter="PEM files (*.pem)")
+        if file_path:
+            try:
+                with open(file_path, "rb") as file:
+                    private_key = RSA.import_key(file.read())
+                    self.rsa_key_status_entry.setText("Private key loaded successfully")
+                return private_key
+            except Exception as e:
+                print(f"Error reading private key: {str(e)}")
+
+    def read_and_set_private_key(self):
+        self.rsa_private_key = self.read_private_key_from_file()
+
+    def read_public_key_from_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(filter="PEM files (*.pem)")
+        if file_path:
+            try:
+                with open(file_path, "rb") as file:
+                    public_key = RSA.import_key(file.read())
+                    self.rsa_key_status_entry.setText("Public key loaded successfully")
+                return public_key
+            except Exception as e:
+                print(f"Error reading public key: {str(e)}")
+
+    def read_and_set_public_key(self):
+        self.rsa_public_key = self.read_public_key_from_file()
+
     def update_mode_combobox(self):
         selected_cipher = self.cipher_combobox.currentData()
         print(selected_cipher)# Get the selected cipher value
@@ -385,30 +414,7 @@ class MyApp(QtWidgets.QWidget):
         cipher_var = self.cipher_combobox.itemData(index)
         self.cipher_label.setText(f"Selected Cipher: {cipher_names.get(cipher_var)}")
 
-    def read_private_key_from_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(filter="PEM files (*.pem)")
-        if file_path:
-            try:
-                with open(file_path, "rb") as file:
-                    private_key = RSA.import_key(file.read())
-                    self.rsa_key_status_entry.setText("Private key loaded successfully")
-                return private_key
-            except Exception as e:
-                print(f"Error reading private key: {str(e)}")
 
-    def read_public_key_from_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(filter="PEM files (*.pem)")
-        if file_path:
-            try:
-                with open(file_path, "rb") as file:
-                    public_key = RSA.import_key(file.read())
-                    self.rsa_key_status_entry.setText("Public key loaded successfully")
-                return public_key
-            except Exception as e:
-                print(f"Error reading public key: {str(e)}")
-
-    def read_and_set_public_key(self):
-        self.rsa_public_key = self.read_public_key_from_file()
 
 
     def set_key(self):
@@ -607,7 +613,10 @@ class MyApp(QtWidgets.QWidget):
 
         encryptedImage = load_image(file_path)
         try:
-            decryptedImage = decrypt_image(encryptedImage, key, mode,selected_cipher)
+            if self.use_rsa_encryption:
+                decryptedImage = decrypt_image(encryptedImage, mode,selected_cipher,rsa_private_key=self.rsa_private_key)
+            else:
+                decryptedImage = decrypt_image(encryptedImage, mode,selected_cipher,key=key)
         except ValueError as e:
             show_alert(f"Decryption failed: {str(e)}")
             return None

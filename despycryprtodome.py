@@ -18,7 +18,7 @@ def encrypt_image(image, key, mode, algorithm,rsa_public_key=None):
 
     # Convert original image data to bytes
     imageBytes = image.tobytes()
-
+    print("encryption_key", key)
     # Determine block size based on the algorithm
 
     if algorithm == DES:
@@ -123,7 +123,7 @@ def encrypt_image(image, key, mode, algorithm,rsa_public_key=None):
 def save_image(image, filename):
     cv2.imwrite(filename, image)
 
-def decrypt_image(encrypted_image, key, mode, algorithm):
+def decrypt_image(encrypted_image, mode, algorithm,rsa_private_key=None,key=None):
     rowEncrypted, columnOrig, depthOrig = encrypted_image.shape
     rowOrig = rowEncrypted - 1
     encryptedBytes = encrypted_image.tobytes()
@@ -137,7 +137,7 @@ def decrypt_image(encrypted_image, key, mode, algorithm):
         raise ValueError("Unsupported algorithm")
 
     print(block_size)
-
+    rsa_key_size=256 if rsa_private_key else 0
     nonceSize = 12 if mode in [AES.MODE_CTR,AES.MODE_GCM] else 0
     ivSize = block_size if mode in [algorithm.MODE_CBC] else 0
     tagsize = 16 if mode in [AES.MODE_GCM] else 0
@@ -145,20 +145,40 @@ def decrypt_image(encrypted_image, key, mode, algorithm):
 
     nonce=encryptedBytes[:nonceSize]
 
-    tag = encryptedBytes[nonceSize: nonceSize + 16] if mode in [AES.MODE_GCM] else None
+    tag = encryptedBytes[nonceSize: nonceSize + tagsize] if mode in [AES.MODE_GCM] else None
 
-    print(ivSize)
+    # Decrypt the RSA-encrypted key if RSA private key is provided
+    if rsa_private_key:
+        if mode == AES.MODE_GCM:
+            rsa_encrypted_key = encryptedBytes[nonceSize + tagsize: nonceSize + tagsize + rsa_key_size]
+        elif mode == AES.MODE_CTR:
+            rsa_encrypted_key = encryptedBytes[nonceSize: nonceSize + rsa_key_size]
+        elif mode == algorithm.MODE_CBC:
+            rsa_encrypted_key = encryptedBytes[ivSize: ivSize + rsa_key_size]
+        elif mode == algorithm.MODE_ECB:
+            rsa_encrypted_key = encryptedBytes[:rsa_key_size]
+        else:
+            raise ValueError("Unsupported mode for RSA key decryption")
+
+        rsa_cipher = PKCS1_OAEP.new(rsa_private_key)
+        key = rsa_cipher.decrypt(rsa_encrypted_key)
+        print("decrypted_rsa_key",key)
+    elif key is None:
+        raise ValueError("Either key or rsa_private_key must be provided")
+
 
     imageOrigBytesSize = rowOrig * columnOrig * depthOrig
     paddedSize = (imageOrigBytesSize // block_size + 1) * block_size - imageOrigBytesSize
     print(ivSize, imageOrigBytesSize, paddedSize)
 
-    if mode in [algorithm.MODE_CTR]:
-        encrypted = encryptedBytes[nonceSize: nonceSize + imageOrigBytesSize + paddedSize]
-    elif mode in [AES.MODE_GCM]:
-        encrypted = encryptedBytes[nonceSize + tagsize: nonceSize + tagsize + imageOrigBytesSize + paddedSize]
+    if mode == AES.MODE_GCM:
+        encrypted_start = nonceSize + tagsize + rsa_key_size
+    elif mode == AES.MODE_CTR:
+        encrypted_start = nonceSize + rsa_key_size
     else:
-        encrypted = encryptedBytes[ivSize: ivSize + imageOrigBytesSize + paddedSize]
+        encrypted_start = ivSize + rsa_key_size
+
+    encrypted = encryptedBytes[encrypted_start: encrypted_start + imageOrigBytesSize + paddedSize]
 
     # Decrypt
     if mode == algorithm.MODE_CBC:
