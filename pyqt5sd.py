@@ -19,6 +19,7 @@ import datetime
 
 global key
 global current_stylesheet
+key=None
 current_stylesheet = "dark"
 
 mode_des_names = {
@@ -538,30 +539,52 @@ class MyApp(QtWidgets.QWidget):
         selected_cipher=self.cipher_combobox.currentData()
         print(mode)
         print(selected_cipher)
+        # Ensure the RSA public key is read if RSA encryption is selected
+        if self.use_rsa_encryption and self.rsa_public_key is None:
+            show_alert("RSA encryption of symmetric key is  selected but public key not read. Please read the public key first.")
+            return
         """if mode != DES.MODE_CBC and mode != DES.MODE_ECB:
             print('Only CBC and ECB mode supported...')
             sys.exit()"""
+        if not self.use_rsa_encryption and key is None:
+            show_alert("Key is not set. Please set the key first.")
+            return
 
         file_path, _ = QFileDialog.getOpenFileName()
         print(file_path)
         if not file_path:
             return
         print(file_path, "file path")
-        imageOrig = load_image(file_path)
+        try:
+            imageOrig = load_image(file_path)
+        except ValueError as e:
+            show_alert(f"Error loading image: {str(e)}")
+            return None
         print(imageOrig)
         display_image(imageOrig, "Original image")
 
-        if self.use_rsa_encryption:
-            encryptedImage = encrypt_image(imageOrig, key, mode, selected_cipher, self.rsa_public_key)
-        else:
-            encryptedImage = encrypt_image(imageOrig, key, mode, selected_cipher)
+        try:
+            if self.use_rsa_encryption:
+                encryptedImage = encrypt_image(imageOrig, key, mode, selected_cipher, self.rsa_public_key)
+            else:
+                encryptedImage = encrypt_image(imageOrig, key, mode, selected_cipher)
+        except ValueError as e:
+            show_alert(f"Encryption failed: {str(e)}")
+            return None
 
+        if encryptedImage is None:
+            print("Encryption failed. Please check the key and mode.")
+        else:
+            display_image(encryptedImage, "Encrypted image")
         # Display encrypted image (consider using QLabel to display images in PyQt)
         # display_image(encryptedImage, "Encrypted image")
-        display_image(encryptedImage,"Encrypted image")
-        encrypted_filename = f'{cipher_names.get(selected_cipher, "unknown")}_{mode_aes_names.get(mode, "unknown")}_encrypted_{file_path.split("/")[-1]}.bmp'
-        print(encrypted_filename)
-        save_image(encryptedImage, encrypted_filename)
+            encrypted_images_folder_path= "encrypted_images"
+            if not os.path.exists(encrypted_images_folder_path):
+                os.makedirs(encrypted_images_folder_path)
+                print(f"Folder '{encrypted_images_folder_path}' created successfully.")
+            encrypted_filename = f'{encrypted_images_folder_path}\\{cipher_names.get(selected_cipher, "unknown")}_{mode_aes_names.get(mode, "unknown")}_encrypted_{file_path.split("/")[-1]}.bmp'
+            print(encrypted_filename)
+            save_image(encryptedImage, encrypted_filename)
 
 
     def decrypt_button_click(self):
@@ -606,12 +629,23 @@ class MyApp(QtWidgets.QWidget):
         """if mode != DES.MODE_CBC and mode != DES.MODE_ECB:
             print('Only CBC and ECB mode supported...')
             sys.exit()"""
+        if not self.use_rsa_encryption and key is None:
+            show_alert("Key is not set. Please set the key first.")
+            return
 
+        if self.use_rsa_encryption and self.rsa_private_key is None:
+            show_alert("RSA decryption of symmetric key is  selected but private key not read. Please read the private key first.")
+            return
         file_path, _ = QFileDialog.getOpenFileName()
         if not file_path:
             return
 
-        encryptedImage = load_image(file_path)
+        try:
+            encryptedImage = load_image(file_path)
+        except ValueError as e:
+            show_alert(f"Error loading image: {str(e)}")
+            return None
+
         try:
             if self.use_rsa_encryption:
                 decryptedImage = decrypt_image(encryptedImage, mode,selected_cipher,rsa_private_key=self.rsa_private_key)
@@ -623,7 +657,14 @@ class MyApp(QtWidgets.QWidget):
         if decryptedImage is None:
             print("Decryption failed. Please check the key and mode.")
         else:
+            decrypted_images_folder_path = "decrypted_images"
+            if not os.path.exists(decrypted_images_folder_path):
+                os.makedirs(decrypted_images_folder_path)
+                print(f"Folder '{decrypted_images_folder_path}' created successfully.")
             display_image(decryptedImage,"Decrypted image")
+            decrypted_filename = f'{decrypted_images_folder_path}\\{cipher_names.get(selected_cipher, "unknown")}_{mode_aes_names.get(mode, "unknown")}_decrypted_{file_path.split("/")[-1]}.bmp'
+            print(decrypted_filename)
+            save_image(decryptedImage, decrypted_filename)
 
 
     def toggle_theme(self):
