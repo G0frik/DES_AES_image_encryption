@@ -1,9 +1,9 @@
 .idea/
 __pycache__/
 __pycache__
-AES*
-DES*
 *.txt
 rsa_keys/
 blum_goldwasser_keys/
 blum_goldwasser_results/
+encrypted_images/
+decrypted_images/

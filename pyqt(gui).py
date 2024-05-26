@@ -413,34 +413,6 @@ class MyApp(QtWidgets.QWidget):
             show_alert("Cipher and mode must be selected.")
             return
 
-
-        """
-        if selected_cipher == BBS_Stream_Cipher:
-
-            #p, q, seed = BBS_Stream_Cipher.find_prime_congruent_number_x0()
-
-            p_str = self.p_entry.text()
-            q_str = self.q_entry.text()
-            seed_str = self.seed_entry.text()
-
-            try:
-                p = int(p_str)
-                q = int(q_str)
-                seed = int(seed_str)
-            except ValueError:
-                print("Invalid input for p, q, or seed. Please enter valid integers.")
-                return
-            print(p,q,seed)
-            file_path, _ = QFileDialog.getOpenFileName()
-            if not file_path:
-                return
-            cipher = BBS_Stream_Cipher(p, q, seed)
-            keystream = cipher.blum_blum_shub_generator(len(load_image(file_path).tobytes()) * 8)
-
-            encryptedImage = load_image(file_path)
-            decryptedImage = cipher.decrypt_image(encryptedImage, keystream,istext=False)
-            display_image(decryptedImage, "Decrypted image")
-            """
         selected_cipher = self.cipher_combobox.currentData()
         mode = self.mode_combobox.currentData()
 
