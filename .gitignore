@@ -2,6 +2,7 @@
 __pycache__/
 __pycache__
 *.txt
+*.bmp
 rsa_keys/
 blum_goldwasser_keys/
 blum_goldwasser_results/

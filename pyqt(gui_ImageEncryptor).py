@@ -1,7 +1,5 @@
-import math
 import os
 import sys
-import cv2
 from Crypto.Cipher import DES,AES
 from Crypto.Random import get_random_bytes
 from Crypto.PublicKey import RSA
@@ -10,13 +8,12 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon,QPixmap
 from PyQt5.QtWidgets import QFileDialog, QComboBox, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QFrame, \
     QApplication, QMessageBox, QCheckBox
-from des_aes import encrypt_image,decrypt_image,save_image,load_image,display_image
 import qdarkstyle
 import datetime
+from ImageEncryptor import ImageEncryptor
 
-global key
-global current_stylesheet
-key=None
+
+
 current_stylesheet = "dark"
 
 mode_des_names = {
@@ -45,6 +42,7 @@ def show_alert(message):
 class MyApp(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
+        self.encryptor= ImageEncryptor()
         self.use_rsa_encryption = False
         self.rsa_public_key = None
         self.rsa_private_key = None
@@ -61,7 +59,7 @@ class MyApp(QtWidgets.QWidget):
         self.separator.setFrameShape(QFrame.VLine)
         self.separator.setFrameShadow(QFrame.Sunken)
 
-        self.rsa_checkbox = QCheckBox("Use RSA Encryption")
+        self.rsa_checkbox = QCheckBox("Use RSA Encryption / Decryption")
         self.rsa_key_status_label = QLabel("RSA key status:")
         self.rsa_key_status_entry = QLineEdit()
 
@@ -126,7 +124,6 @@ class MyApp(QtWidgets.QWidget):
 
         # Add widgets to right layout
         spacer = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        # Add widgets for Blum-Goldwasser cryptosystem
 
 
 
@@ -170,15 +167,15 @@ class MyApp(QtWidgets.QWidget):
         self.generate_rsa_keys_button.clicked.connect(self.generate_rsa_keys_values)
         #self.read_private_key_button.clicked.connect(self.read_private_key_from_file)
 
-        self.read_private_key_button.clicked.connect(self.read_and_set_private_key)
-        self.read_public_key_button.clicked.connect(self.read_and_set_public_key)
+        self.read_private_key_button.clicked.connect(self.read_private_key_from_file)
+        self.read_public_key_button.clicked.connect(self.read_public_key_from_file)
         self.rsa_checkbox.stateChanged.connect(self.toggle_rsa_encryption)
 
         self.update_mode_combobox()
 
     def toggle_rsa_encryption(self, state):
         # Update the flag based on the checkbox state
-        self.use_rsa_encryption = state == Qt.Checked
+        self.encryptor.use_rsa_encryption = state == Qt.Checked
 
 
     def generate_rsa_keys_values(self):
@@ -208,32 +205,28 @@ class MyApp(QtWidgets.QWidget):
         if file_path:
             try:
                 with open(file_path, "rb") as file:
-                    private_key = RSA.import_key(file.read())
+                    self.encryptor.rsa_private_key = RSA.import_key(file.read())
                     self.rsa_key_status_entry.setText("Private key loaded successfully")
-                return private_key
             except Exception as e:
                 print(f"Error reading private key: {str(e)}")
 
-    def read_and_set_private_key(self):
-        self.rsa_private_key = self.read_private_key_from_file()
+
 
     def read_public_key_from_file(self):
         file_path, _ = QFileDialog.getOpenFileName(filter="PEM files (*.pem)")
+        print(file_path, "file path")
         if file_path:
             try:
                 with open(file_path, "rb") as file:
-                    public_key = RSA.import_key(file.read())
+                    self.encryptor.rsa_public_key= RSA.import_key(file.read())
                     self.rsa_key_status_entry.setText("Public key loaded successfully")
-                return public_key
             except Exception as e:
                 print(f"Error reading public key: {str(e)}")
 
-    def read_and_set_public_key(self):
-        self.rsa_public_key = self.read_public_key_from_file()
 
     def update_mode_combobox(self):
-        selected_cipher = self.cipher_combobox.currentData()
-        print(selected_cipher)# Get the selected cipher value
+        self.encryptor.cipher = self.cipher_combobox.currentData()
+        print(self.encryptor.cipher)# Get the selected cipher value
         print(DES)
         # Clear the mode combobox
         self.mode_combobox.clear()
@@ -241,22 +234,22 @@ class MyApp(QtWidgets.QWidget):
         # Add "None" option to the mode combobox
         self.mode_combobox.addItem("None", None)
 
-        if selected_cipher == DES:
+        if self.encryptor.cipher == DES:
             # Add DES modes if DES is selected
             for mode_val, mode_name in mode_des_names.items():
                 self.mode_combobox.addItem(mode_name, mode_val)
 
-        elif selected_cipher == AES:
+        elif self.encryptor.cipher == AES:
             for mode_val, mode_name in mode_aes_names.items():
                 self.mode_combobox.addItem(mode_name, mode_val)
 
     def set_mode(self, index):
         mode_var = self.mode_combobox.itemData(index)
 
-        selected_cipher = self.cipher_combobox.currentData()
-        if selected_cipher == DES:
+        self.encryptor.cipher = self.cipher_combobox.currentData()
+        if self.encryptor.cipher == DES:
             mode_name = mode_des_names.get(mode_var)
-        elif selected_cipher == AES:
+        elif self.encryptor.cipher == AES:
             mode_name = mode_aes_names.get(mode_var)
         else:
             mode_name = None
@@ -270,16 +263,15 @@ class MyApp(QtWidgets.QWidget):
 
 
     def set_key(self):
-        global key
 
         key_str = self.key_entry.text()
-        selected_cipher = self.cipher_combobox.currentData()
+        self.encryptor.cipher = self.cipher_combobox.currentData()
 
-        if selected_cipher == DES:
+        if self.encryptor.cipher == DES:
             if len(key_str) != 8:
                 self.key_entry.clear()
                 self.key_entry.insert("Key must be 8 bytes")
-        elif selected_cipher == AES:
+        elif self.encryptor.cipher == AES:
             if len(key_str) != 32:
                 self.key_entry.clear()
                 show_alert("No cipher selected. Select a cipher first.")
@@ -291,18 +283,17 @@ class MyApp(QtWidgets.QWidget):
 
 
         key_bytes = key_str.encode('utf-8')
-        key = key_bytes
+        self.encryptor.key = key_bytes
 
     def generate_random_key(self):
-        global key
-        selected_cipher = self.cipher_combobox.currentData()
-        #print(selected_cipher, "check")
-        if selected_cipher == DES:
-            key = get_random_bytes(8)
+        self.encryptor.cipher = self.cipher_combobox.currentData()
+        #print(self.encryptor.cipher, "check")
+        if self.encryptor.cipher == DES:
+            self.encryptor.key = get_random_bytes(8)
             self.key_entry.clear()
             self.key_entry.insert("Generated Random Key for DES")
-        elif selected_cipher == AES:
-            key = get_random_bytes(32)
+        elif self.encryptor.cipher == AES:
+            self.encryptor.key = get_random_bytes(32)
             self.key_entry.clear()
             self.key_entry.insert("Generated Random Key for AES")
         else:
@@ -313,7 +304,6 @@ class MyApp(QtWidgets.QWidget):
 
 
     def save_key_to_file(self):
-        global key
 
         file_path, _ = QFileDialog.getSaveFileName(filter="Text files (*.txt)")
 
@@ -321,7 +311,7 @@ class MyApp(QtWidgets.QWidget):
         if file_path:
             try:
                 with open(file_path, "wb") as key_file:
-                    key_file.write(key)
+                    key_file.write(self.encryptor.key)
                 self.key_entry.clear()
                 self.key_entry.insert( "Key was written to file")
             except Exception as e:
@@ -330,13 +320,12 @@ class MyApp(QtWidgets.QWidget):
             print("No file selected for saving the key.")
 
     def read_key_from_file(self):
-        global key
 
         file_path, _ = QFileDialog.getOpenFileName(filter="Text files (*.txt)")
         if file_path:
             try:
                 with open(file_path, "rb") as key_file:
-                    key = key_file.read()
+                    self.encryptor.key = key_file.read()
                     self.key_entry.clear()
                     self.key_entry.insert("Key was read from file")
             except FileNotFoundError:
@@ -345,23 +334,23 @@ class MyApp(QtWidgets.QWidget):
 
     def encrypt_button_click(self):
 
-        selected_cipher = self.cipher_combobox.currentData()
-        mode = self.mode_combobox.currentData()
-        print(selected_cipher,mode)
-        if selected_cipher is None or mode is None:
+        self.encryptor.cipher = self.cipher_combobox.currentData()
+        self.encryptor.mode = self.mode_combobox.currentData()
+        print(self.encryptor.cipher,self.encryptor.mode)
+        if self.encryptor.cipher is None or self.encryptor.mode is None:
             show_alert("Cipher and mode must be selected.")
             return
 
-        mode = self.mode_combobox.currentData()
-        selected_cipher=self.cipher_combobox.currentData()
-        print(mode)
-        print(selected_cipher)
+        self.encryptor.mode = self.mode_combobox.currentData()
+        self.encryptor.cipher=self.cipher_combobox.currentData()
+        print(self.encryptor.mode)
+        print(self.encryptor.cipher)
         # Ensure the RSA public key is read if RSA encryption is selected
-        if self.use_rsa_encryption and self.rsa_public_key is None:
+        if self.encryptor.use_rsa_encryption and self.encryptor.rsa_public_key is None:
             show_alert("RSA encryption of symmetric key is  selected but public key not read. Please read the public key first.")
             return
-
-        if not self.use_rsa_encryption and key is None:
+        print(self.encryptor.use_rsa_encryption, "use rsa encryption" )
+        if not self.encryptor.use_rsa_encryption and self.encryptor.key is None:
             show_alert("Key is not set. Please set the key first.")
             return
 
@@ -372,8 +361,8 @@ class MyApp(QtWidgets.QWidget):
             return
         #print(file_path, "file path")
         try:
-            imageOrig = load_image(file_path)
-            display_image(imageOrig, "Original image")
+            imageOrig = ImageEncryptor.load_image(file_path)
+            ImageEncryptor.display_image(imageOrig, "Original image")
         except Exception as e:
             show_alert(f"Error loading image: {str(e)}")
             return None
@@ -381,10 +370,7 @@ class MyApp(QtWidgets.QWidget):
 
 
         try:
-            if self.use_rsa_encryption:
-                encryptedImage = encrypt_image(imageOrig, key, mode, selected_cipher, self.rsa_public_key)
-            else:
-                encryptedImage = encrypt_image(imageOrig, key, mode, selected_cipher)
+            encryptedImage = self.encryptor.encrypt(imageOrig)
         except ValueError as e:
             show_alert(f"Encryption failed: {str(e)}")
             return None
@@ -392,35 +378,35 @@ class MyApp(QtWidgets.QWidget):
         if encryptedImage is None:
             print("Encryption failed. Please check the key and mode.")
         else:
-            display_image(encryptedImage, "Encrypted image")
+            ImageEncryptor.display_image(encryptedImage, "Encrypted image")
         # Display encrypted image (consider using QLabel to display images in PyQt)
         # display_image(encryptedImage, "Encrypted image")
             encrypted_images_folder_path= "encrypted_images"
             if not os.path.exists(encrypted_images_folder_path):
                 os.makedirs(encrypted_images_folder_path)
                 print(f"Folder '{encrypted_images_folder_path}' created successfully.")
-            encrypted_filename = f'{encrypted_images_folder_path}\\{cipher_names.get(selected_cipher, "unknown")}_{mode_aes_names.get(mode, "unknown")}_encrypted_{file_path.split("/")[-1]}.bmp'
+            encrypted_filename = f'{encrypted_images_folder_path}\\{cipher_names.get(self.encryptor.cipher, "unknown")}_{mode_aes_names.get(self.encryptor.mode, "unknown")}_encrypted_{file_path.split("/")[-1]}.bmp'
             print(encrypted_filename)
-            save_image(encryptedImage, encrypted_filename)
+            ImageEncryptor.save_image(encryptedImage, encrypted_filename)
 
 
     def decrypt_button_click(self):
 
-        selected_cipher = self.cipher_combobox.currentData()
-        mode = self.mode_combobox.currentData()
+        self.encryptor.cipher = self.cipher_combobox.currentData()
+        self.encryptor.mode = self.mode_combobox.currentData()
 
-        if selected_cipher is None or mode is None:
+        if self.encryptor.cipher is None or self.encryptor.mode is None:
             show_alert("Cipher and mode must be selected.")
             return
 
-        selected_cipher = self.cipher_combobox.currentData()
-        mode = self.mode_combobox.currentData()
-
-        if not self.use_rsa_encryption and key is None:
+        self.encryptor.cipher = self.cipher_combobox.currentData()
+        self.encryptor.mode = self.mode_combobox.currentData()
+        print(self.encryptor.use_rsa_encryption, "use rsa encryption")
+        if not self.encryptor.use_rsa_encryption and self.encryptor.key is None:
             show_alert("Key is not set. Please set the key first.")
             return
 
-        if self.use_rsa_encryption and self.rsa_private_key is None:
+        if self.encryptor.use_rsa_encryption and self.encryptor.rsa_private_key is None:
             show_alert("RSA decryption of symmetric key is  selected but private key not read. Please read the private key first.")
             return
         file_filter = "Image Files (*.png *.jpg *.jpeg *.bmp);"
@@ -429,17 +415,13 @@ class MyApp(QtWidgets.QWidget):
             return
 
         try:
-            encryptedImage = load_image(file_path)
+            encryptedImage = ImageEncryptor.load_image(file_path)
         except ValueError as e:
             show_alert(f"Error loading image: {str(e)}")
             return None
 
         try:
-            if self.use_rsa_encryption:
-                #print("rsa")
-                decryptedImage = decrypt_image(encryptedImage, mode,selected_cipher,rsa_private_key=self.rsa_private_key)
-            else:
-                decryptedImage = decrypt_image(encryptedImage, mode,selected_cipher,key=key)
+            decryptedImage = self.encryptor.decrypt(encryptedImage)
         except Exception as e:
             show_alert(f"Decryption failed: {str(e)}")
             return None
@@ -450,10 +432,10 @@ class MyApp(QtWidgets.QWidget):
             if not os.path.exists(decrypted_images_folder_path):
                 os.makedirs(decrypted_images_folder_path)
                 print(f"Folder '{decrypted_images_folder_path}' created successfully.")
-            display_image(decryptedImage,"Decrypted image")
-            decrypted_filename = f'{decrypted_images_folder_path}\\{cipher_names.get(selected_cipher, "unknown")}_{mode_aes_names.get(mode, "unknown")}_decrypted_{file_path.split("/")[-1]}.bmp'
+            ImageEncryptor.display_image(decryptedImage,"Decrypted image")
+            decrypted_filename = f'{decrypted_images_folder_path}\\{cipher_names.get(self.encryptor.cipher, "unknown")}_{mode_aes_names.get(self.encryptor.mode, "unknown")}_decrypted_{file_path.split("/")[-1]}.bmp'
             print(decrypted_filename)
-            save_image(decryptedImage, decrypted_filename)
+            ImageEncryptor.save_image(decryptedImage, decrypted_filename)
 
 
     def toggle_theme(self):

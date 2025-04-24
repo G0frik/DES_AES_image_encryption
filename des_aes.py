@@ -222,19 +222,19 @@ def decrypt_image(encrypted_image, mode, algorithm,rsa_private_key=None,key=None
 
 def main():
     mode_names = {
-        DES.MODE_CBC: "DES.MODE_CBC",
+        AES.MODE_CBC: "AES.MODE_CBC",
         DES.MODE_ECB: "DES.MODE_ECB",
         DES.MODE_CFB: "DES.MODE_CFB"
         # Add other modes as needed
     }
     # Set mode
-    mode = DES.MODE_CBC
+    mode = AES.MODE_CBC
     print(str(mode))
     # mode = DES.MODE_ECB
 
 
     # Set sizes
-    keySize = 8
+    keySize = 32
 
     # Load original image
     image_path="tux_clear.bmp"
@@ -245,7 +245,7 @@ def main():
 
     # Encrypt
     key = get_random_bytes(keySize)
-    encryptedImage = encrypt_image(imageOrig, key, DES.MODE_CFB)
+    encryptedImage = encrypt_image(imageOrig, key, AES.MODE_CBC,AES)
 
     # Display encrypted image
     display_image(encryptedImage, "Encrypted image")
@@ -255,7 +255,7 @@ def main():
     # save_image(encryptedImage, "topsecretEnc.bmp")
 
     # Decrypt
-    decryptedImage = decrypt_image(load_image(f"{mode_names.get(mode, 'unknown')}_encrypted{image_path}.bmp"), key, mode)
+    decryptedImage = decrypt_image(load_image(f"{mode_names.get(mode, 'unknown')}_encrypted{image_path}.bmp"),mode=AES.MODE_CBC, algorithm=AES, key=key )
 
     # Display decrypted image
     display_image(decryptedImage, "Decrypted Image")
