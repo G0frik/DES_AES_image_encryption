@@ -12,3 +12,5 @@ blum_goldwasser_results/
 encrypted_images/
 decrypted_images/
 frames/
+frames_*/
+*.avi

@@ -1,9 +1,13 @@
+import uuid
+
 import cv2
 import numpy as np
-from Crypto.Cipher import DES, AES, PKCS1_OAEP
-from Crypto.Util.Padding import pad, unpad
+import os
+import tempfile
+import shutil
+from Crypto.Cipher import AES, DES, PKCS1_OAEP
 from Crypto.Random import get_random_bytes
-from Crypto.PublicKey import RSA
+from Crypto.Util.Padding import pad, unpad
 
 
 class ImageEncryptor:
@@ -14,6 +18,79 @@ class ImageEncryptor:
         self.use_rsa_encryption = use_rsa_encryption
         self.rsa_public_key = rsa_public_key
         self.rsa_private_key = rsa_private_key
+    @staticmethod
+    def generate_uuid(length=8):
+        """Generate a UUID and return the first 'length' characters as a string."""
+        return str(uuid.uuid4()).replace('-', '')[:length]
+
+    @staticmethod
+    def extract_frames_to_temp(video_path, duration_sec=15):
+        cap = cv2.VideoCapture(video_path)
+
+        if not cap.isOpened():
+            raise IOError(f"Failed to open video: {video_path}")
+
+        # Get FPS from video
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        print(f"FPS: {fps}")
+        if fps == 0:
+            raise ValueError("Could not determine FPS of the video.")
+
+        temp_dir = tempfile.mkdtemp(prefix="frames_")
+        max_frames = int(duration_sec * fps)
+        print(f"Extracting frames for {duration_sec} seconds (up to {max_frames} frames)...")
+        frame_count = 0
+
+        while frame_count < max_frames:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frame_path = os.path.join(temp_dir, f"frame_{frame_count:04d}.png")
+            ImageEncryptor.save_image(frame,frame_path)
+            frame_count += 1
+
+        cap.release()
+        print(f"Extracted {frame_count} frames at {fps:.2f} FPS to temporary directory '{temp_dir}'")
+        return temp_dir, int(fps)  # Also return the detected FPS
+    @staticmethod
+    def reassemble_video_from_frames(frame_dir, output_video_path, fps=30, compare_mode=False):
+        try:
+            # Use '.png' if compare_mode is True, otherwise only 'encrypted.png'
+            frame_files = sorted([
+                f for f in os.listdir(frame_dir)
+                if (f.endswith('.png') if compare_mode else f.endswith('encrypted.png'))
+            ])
+
+            if not frame_files:
+                raise ValueError("No suitable PNG frames found in the directory.")
+
+            # Read first frame to get video dimensions
+            first_frame_path = os.path.join(frame_dir, frame_files[0])
+            first_frame = ImageEncryptor.load_image(first_frame_path)
+            if first_frame is None:
+                raise ValueError(f"Could not read the first frame: {first_frame_path}")
+            height, width, _ = first_frame.shape
+
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Use 'mp4v' for compatibility
+            out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
+
+            for file_name in frame_files:
+                frame_path = os.path.join(frame_dir, file_name)
+                frame = ImageEncryptor.load_image(frame_path)
+                if frame is None:
+                    print(f"Warning: Skipping unreadable frame: {frame_path}")
+                    continue
+                out.write(frame)
+
+            out.release()
+            shutil.rmtree(frame_dir)
+            print(f"Video saved to '{output_video_path}' and temporary directory removed.")
+        except Exception as e:
+            print(f"[ERROR] Failed to reassemble video: {e}")
+            if 'out' in locals():
+                out.release()
+            if os.path.exists(frame_dir):
+                shutil.rmtree(frame_dir, ignore_errors=True)
 
     @staticmethod
     def load_image(filename):
@@ -193,6 +270,31 @@ class ImageEncryptor:
                                                                                                  depthOrig)
         return decryptedImage
 
+    def encrypt_video_frames(self,input_video,compare_mode=False):
+        os.makedirs("encrypted_videos", exist_ok=True)
+        video_filename = os.path.basename(input_video)
+        print(f"Encrypting video: {video_filename}")
+
+        # Step 1: Extract frames from video
+        temp_frame_dir = ImageEncryptor.extract_frames_to_temp(input_video)
+        output_video_name = os.path.join("encrypted_videos",
+                                         f"encrypted_{os.path.splitext(video_filename)[0]}_{ImageEncryptor.generate_uuid()}.mp4")
+        # Step 2: Encrypt each frame
+        frame_files = [f for f in os.listdir(temp_frame_dir[0]) if f.endswith('.png')]
+        for frame_file in frame_files:
+            frame_path = os.path.join(temp_frame_dir[0], frame_file)
+            encrypted_frame_path = frame_path.replace('.png', '_encrypted.png')
+
+            frame_image = self.load_image(frame_path)
+            encrypted_image = self.encrypt(frame_image)
+            self.save_image(encrypted_image, encrypted_frame_path)
+
+        print(f"Frames extracted from '{input_video}' and encrypted to '{temp_frame_dir[0]}' using {self.mode}.")
+        print(f"Encrypted frames ready for reassembly into '{output_video_name}'.")
+        ImageEncryptor.reassemble_video_from_frames(temp_frame_dir[0], output_video_name, fps=temp_frame_dir[1],
+                                     compare_mode=compare_mode)
+
+
     def generate_key(self, cipher_type):
         if cipher_type == DES:
             self.key = get_random_bytes(8)
@@ -202,6 +304,4 @@ class ImageEncryptor:
             raise ValueError("Unsupported cipher for key generation.")
 
         return self.key
-
-
 

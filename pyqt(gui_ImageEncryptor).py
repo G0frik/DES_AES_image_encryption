@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import QFileDialog, QComboBox, QLabel, QLineEdit, QPushButt
 import qdarkstyle
 import datetime
 from ImageEncryptor import ImageEncryptor
+import qdarktheme
 
 
 
@@ -515,7 +516,7 @@ class MyApp(QtWidgets.QWidget):
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
-    app.setStyle("Fusion")  # Optional: Use the Fusion style for a more modern look
+    #app.setStyle("Breeze")  # Optional: Use the Fusion style for a more modern look
     window = MyApp()
     window.setWindowTitle("Image Encryption/Decryption")
     window.setGeometry(100,100,800, 600)  # Adjust the window size
