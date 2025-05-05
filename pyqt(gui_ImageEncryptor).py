@@ -385,7 +385,7 @@ class MyApp(QtWidgets.QWidget):
             if not os.path.exists(encrypted_images_folder_path):
                 os.makedirs(encrypted_images_folder_path)
                 print(f"Folder '{encrypted_images_folder_path}' created successfully.")
-            encrypted_filename = f'{encrypted_images_folder_path}\\{cipher_names.get(self.encryptor.cipher, "unknown")}_{mode_aes_names.get(self.encryptor.mode, "unknown")}_encrypted_{file_path.split("/")[-1]}.bmp'
+            encrypted_filename = f'{encrypted_images_folder_path}\\{cipher_names.get(self.encryptor.cipher, "unknown")}_{mode_aes_names.get(self.encryptor.mode, "unknown")}_encrypted_{file_path.split("/")[-1]}.png'
             print(encrypted_filename)
             ImageEncryptor.save_image(encryptedImage, encrypted_filename)
 
@@ -433,7 +433,7 @@ class MyApp(QtWidgets.QWidget):
                 os.makedirs(decrypted_images_folder_path)
                 print(f"Folder '{decrypted_images_folder_path}' created successfully.")
             ImageEncryptor.display_image(decryptedImage,"Decrypted image")
-            decrypted_filename = f'{decrypted_images_folder_path}\\{cipher_names.get(self.encryptor.cipher, "unknown")}_{mode_aes_names.get(self.encryptor.mode, "unknown")}_decrypted_{file_path.split("/")[-1]}.bmp'
+            decrypted_filename = f'{decrypted_images_folder_path}\\{cipher_names.get(self.encryptor.cipher, "unknown")}_{mode_aes_names.get(self.encryptor.mode, "unknown")}_decrypted_{file_path.split("/")[-1]}.png'
             print(decrypted_filename)
             ImageEncryptor.save_image(decryptedImage, decrypted_filename)
 

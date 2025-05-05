@@ -3,8 +3,12 @@ __pycache__/
 __pycache__
 *.txt
 *.bmp
+test*
+*.png
+*.mp4
 rsa_keys/
 blum_goldwasser_keys/
 blum_goldwasser_results/
 encrypted_images/
 decrypted_images/
+frames/
