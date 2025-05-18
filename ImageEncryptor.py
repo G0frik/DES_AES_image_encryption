@@ -106,6 +106,14 @@ class ImageEncryptor:
         cv2.waitKey()
         cv2.destroyAllWindows()
 
+    def rsa_encrypt(self, data: bytes) -> bytes:
+        cipher_rsa = PKCS1_OAEP.new(self.rsa_public_key)
+        return cipher_rsa.encrypt(data)
+
+    def rsa_decrypt(self, encrypted_data: bytes) -> bytes:
+        cipher_rsa = PKCS1_OAEP.new(self.rsa_private_key)
+        return cipher_rsa.decrypt(encrypted_data)
+
     def encrypt(self, image):
         if self.cipher is None or self.mode is None:
             raise ValueError("Cipher and mode must be set before encryption.")
@@ -135,9 +143,7 @@ class ImageEncryptor:
                 parts = [nonce, tag]
 
                 if self.use_rsa_encryption and self.rsa_public_key:
-                    rsa_cipher = PKCS1_OAEP.new(self.rsa_public_key)
-                    encrypted_key = rsa_cipher.encrypt(self.key)
-                    parts.append(encrypted_key)
+                    parts.append(self.rsa_encrypt(self.key))
 
                 parts.append(ciphertext)
                 buffer = b''.join(parts) + bytes(void)
@@ -156,9 +162,7 @@ class ImageEncryptor:
                 parts = [nonce]
 
                 if self.use_rsa_encryption and self.rsa_public_key:
-                    rsa_cipher = PKCS1_OAEP.new(self.rsa_public_key)
-                    encrypted_key = rsa_cipher.encrypt(self.key)
-                    parts.append(encrypted_key)
+                    parts.append(self.rsa_encrypt(self.key))
 
                 parts.append(ciphertext)
                 buffer = b''.join(parts) + bytes(void)
@@ -183,9 +187,7 @@ class ImageEncryptor:
         if iv:
             parts.append(iv)
         if self.use_rsa_encryption and self.rsa_public_key:
-            rsa_cipher = PKCS1_OAEP.new(self.rsa_public_key)
-            encrypted_key = rsa_cipher.encrypt(self.key)
-            parts.append(encrypted_key)
+            parts.append(self.rsa_encrypt(self.key))
 
         parts.append(ciphertext)
 
@@ -230,8 +232,7 @@ class ImageEncryptor:
             else:
                 raise ValueError("Unsupported mode for RSA key decryption")
 
-            rsa_cipher = PKCS1_OAEP.new(self.rsa_private_key)
-            self.key = rsa_cipher.decrypt(rsa_encrypted_key)
+            self.key = self.rsa_decrypt(rsa_encrypted_key)
         elif self.key is None:
             raise ValueError("Either key or rsa_private_key must be provided")
 

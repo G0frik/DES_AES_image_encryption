@@ -60,7 +60,40 @@ class MyApp(QtWidgets.QWidget):
         self.separator.setFrameShape(QFrame.VLine)
         self.separator.setFrameShadow(QFrame.Sunken)
 
-        self.rsa_checkbox = QCheckBox("Use RSA Encryption / Decryption")
+
+        self.mode_display_label = QLabel("Current Mode: Educational")  # Default text
+        self.mode_display_label.setStyleSheet("""
+            font-size: 20px;
+            font-weight: bold;
+            color: rgba(255, 255, 255, 150);  /* White with transparency */
+            text-align: center;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        """)
+        # Purpose label styling
+        # Purpose label styling
+        self.purpose_label = QLabel("Select Purpose:")
+        self.purpose_label.setStyleSheet("""
+            font-size: 16px;
+            font-weight: bold;
+            color: #4CAF50;  /* Green color to make it stand out */
+            margin-bottom: 5px;
+        """)
+
+        # Purpose combo box styling
+        self.purpose_combobox = QComboBox()
+        self.purpose_combobox.addItem("Educational purpose")
+        self.purpose_combobox.addItem("Intended purpose")
+        self.purpose_combobox.setStyleSheet("""
+            font-size: 14px;  
+            border: 2px solid #4CAF50;  /* Green border to match the label */
+            padding: 5px;
+            border-radius: 5px;
+        """)
+
+        self.rsa_checkbox = QCheckBox("Use RSA Encryption / Decryption wit symmetric key")
         self.rsa_key_status_label = QLabel("RSA key status:")
         self.rsa_key_status_entry = QLineEdit()
 
@@ -99,7 +132,11 @@ class MyApp(QtWidgets.QWidget):
         vbox_left = QVBoxLayout()
         vbox_right = QVBoxLayout()
 
+        # Create a QLabel for displaying the current mode in the center
 
+
+        # Update mode text when combo box selection changes
+        self.purpose_combobox.currentIndexChanged.connect(self.update_mode_display)
 
         # Set alignment and spacing for both layouts
         vbox_left.setAlignment(QtCore.Qt.AlignBottom)
@@ -108,7 +145,16 @@ class MyApp(QtWidgets.QWidget):
         #vbox_right.setSpacing(10)  # Adjust the spacing as needed
 
         # Add widgets to left layout
+        vbox_left.addWidget(self.purpose_label)
+        vbox_left.addWidget(self.purpose_combobox)
 
+
+        spacer_item = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+
+        vbox_left.addItem(spacer_item)
+        vbox_left.addWidget(self.mode_display_label)
+
+        vbox_left.addItem(spacer_item)
         vbox_left.addWidget(self.rsa_key_status_label)
         vbox_left.addWidget(self.rsa_key_status_entry)
         vbox_left.addWidget(self.generate_rsa_keys_button)
@@ -152,6 +198,7 @@ class MyApp(QtWidgets.QWidget):
 
         # Set the horizontal layout as the main layout for your window
         self.setLayout(hbox)
+        # Add the mode display label at the center of the window
 
         #DES,AES
         self.set_key_button.clicked.connect(self.set_key)
@@ -174,6 +221,12 @@ class MyApp(QtWidgets.QWidget):
 
         self.update_mode_combobox()
 
+    def update_mode_display(self):
+        selected_mode = self.purpose_combobox.currentText()
+        if selected_mode == "Educational purpose":
+            self.mode_display_label.setText("Current Mode: Educational")
+        else:
+            self.mode_display_label.setText("Current Mode: Real Use")
     def toggle_rsa_encryption(self, state):
         # Update the flag based on the checkbox state
         self.encryptor.use_rsa_encryption = state == Qt.Checked

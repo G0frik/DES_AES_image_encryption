@@ -1,11 +1,13 @@
 .idea/
 __pycache__/
 __pycache__
+*.png
+*.mp4
+*.webp
+*.jpg
 *.txt
 *.bmp
 test*
-*.png
-*.mp4
 rsa_keys/
 blum_goldwasser_keys/
 blum_goldwasser_results/
