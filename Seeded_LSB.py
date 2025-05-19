@@ -24,15 +24,14 @@ def timeit(func):
     return wrapper
 
 class ImageEncryptorlsb:
-    SEED_LENGTH_BITS_RSA_SIZE = 2048
-    CHANNELS = 3
-    SEED_HEADER_PIXELS  = int((SEED_LENGTH_BITS_RSA_SIZE / CHANNELS) + ((SEED_LENGTH_BITS_RSA_SIZE % CHANNELS) != 0))
+    HEADER_LENGTH_BITS_RSA = 2048
 
     def __init__(self, cipher=None, mode=None, key=None, rsa_public_key=None, rsa_private_key=None,
                  use_rsa_encryption=False):
         self.use_rsa_encryption = use_rsa_encryption
         self.rsa_public_key = rsa_public_key
         self.rsa_private_key = rsa_private_key
+
 
     def rsa_encrypt(self, data: bytes) -> bytes:
         cipher_rsa = PKCS1_OAEP.new(self.rsa_public_key)
@@ -43,6 +42,10 @@ class ImageEncryptorlsb:
         return cipher_rsa.decrypt(encrypted_data)
 
     def hide_data_in_image_seeded(self, image_path, binary_data, output_path, seed):
+
+
+
+
         time_start_start=time.time()
         """
         Hide binary data in an image using seeded LSB steganography
@@ -58,15 +61,15 @@ class ImageEncryptorlsb:
         """
         try:
             # Open the image with OpenCV
-            img = cv2.imread(image_path)
+            img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+            height, width, channels = img.shape
             flat_img = img.reshape(-1)  # flatten
+            HEADER_PIXELS = int((self.HEADER_LENGTH_BITS_RSA / channels) + ((self.HEADER_LENGTH_BITS_RSA % channels) != 0))
 
             if img is None:
                 print(f"Error: Could not open image {image_path}")
                 return False
 
-            height, width, channels = img.shape
-            print(height, width, channels, "height, width, channels")
 
             # Calculate maximum data capacity (in bytes)
             # We're using 1 bit per color channel, so 3 bits per pixel
@@ -75,34 +78,36 @@ class ImageEncryptorlsb:
             # Encrypt the seed if using RSA
             len_data = len(binary_data)
             len_bytes = len_data.to_bytes(4,byteorder="big")
+
             if self.use_rsa_encryption:
                 if self.rsa_public_key is None:
-                    print("RSA public key not provided.")
+                    print("Error: RSA public key not provided.")
                     return False
+                data_hash = hashlib.sha256(binary_data).digest()
                 seed_bytes = seed.to_bytes(4, byteorder='big')
-                plain_header=seed_bytes + len_bytes
+                plain_header=seed_bytes + len_bytes + data_hash
                 encrypted_header = self.rsa_encrypt(plain_header)
                 print("Hash of plaintext seed (before encrypting):", hashlib.sha256(seed_bytes).hexdigest())
 
                 # After extracting
-
-                if len(encrypted_header)*8 != self.SEED_LENGTH_BITS_RSA_SIZE:
-                    print("Encrypted seed has unexpected length.")
+                if len(encrypted_header)*8 != self.HEADER_LENGTH_BITS_RSA:
+                    print("Error: Encrypted seed has unexpected length.")
                     return False
-            else:
-                encrypted_header = b''
-            # Prepend encrypted seed to image in fixed pixel range
 
-            print(len_data,"len_Data")
+
+            #print(len_data,"len_Data")
+
             data_to_hide = binary_data
             #binary_bits = [int(bit) for byte in data_to_hide for bit in format(byte, '08b')]
             binary_bits = np.unpackbits(np.frombuffer(data_to_hide, dtype=np.uint8))
+
             #seed_data_bits = [int(bit) for byte in encrypted_seed for bit in format(byte, '08b')]
+
             #header_bits = [int(bit) for byte in encrypted_header for bit in format(byte, '08b')]
             header_bits = np.unpackbits(np.frombuffer(encrypted_header, dtype=np.uint8))
 
             if (len(header_bits) + len(binary_bits)) > height * width * channels:
-                print("Data + seed too large for image.")
+                print("Error: Data + seed too large for image.")
                 return False
 
             len_header_bits=len(header_bits)
@@ -119,20 +124,18 @@ class ImageEncryptorlsb:
 
 # The original value is known at embedding time
             if len(str(seed)) < 8:
-                print("Seed must be at least 8 digits long.")
+                print("Error: Seed must be at least 8 digits long.")
                 return False
-            #random.seed(seed)
 
-            data_start_index = self.SEED_HEADER_PIXELS * 3
-            available_indices = list(range(data_start_index, height * width * channels))
-            #positions = random.sample(available_indices, len(binary_bits))
+            data_start_index = HEADER_PIXELS * channels
+
             time_start=time.time()
             rng = np.random.default_rng(seed_value)
             positions= rng.choice(np.arange(data_start_index, height * width * channels), size=len(binary_bits), replace=False)
             time_end=time.time()
             print("Execution time rng.choice_hide:", time_end - time_start)
             print(positions[0:10], "positions", len(positions))
-            #print(available_indices,"available_indices",len(binary_bits),"len_binary_bits")
+
             time_start=time.time()
             # Changing code below to flattened array instead of 2D
             """for i, pos in enumerate(positions):
@@ -164,7 +167,6 @@ class ImageEncryptorlsb:
 
             print("Execution time from the start of method :", time_end_end - time_start_start)
             time_end = time.time()
-            time_end_end = time.time()
             cv2.imwrite(output_path, img)
 
             print("Execution time hiding bits:", time_end - time_start)
@@ -177,6 +179,7 @@ class ImageEncryptorlsb:
 
 
     def extract_data_from_image_seeded(self, image_path):
+
         """
         Extract hidden binary data from an image using the same seed
 
@@ -187,40 +190,42 @@ class ImageEncryptorlsb:
             bytes: Extracted binary data or None if failed
         """
         try:
-            img = cv2.imread(image_path)
+            img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
             if img is None:
                 print(f"Error: Could not open image {image_path}")
                 return None
 
             height, width, channels = img.shape
-
+            HEADER_PIXELS = int((self.HEADER_LENGTH_BITS_RSA / channels) + ((self.HEADER_LENGTH_BITS_RSA % channels) != 0))
+            #print(HEADER_PIXELS)
             flat_img = img.reshape(-1)
 
             # Step 1: Extract the encrypted seed (assumed fixed in first pixels)
-            encrypted_seed_bits = flat_img[:self.SEED_LENGTH_BITS_RSA_SIZE] & 1
+            encrypted_seed_bits = flat_img[:self.HEADER_LENGTH_BITS_RSA] & 1
             encrypted_seed_bytes = np.packbits(encrypted_seed_bits).tobytes()
 
             if self.use_rsa_encryption:
                 if self.rsa_private_key is None:
-                    print("RSA private key not provided.")
+                    print("Error: RSA private key not provided.")
                     return None
 
                 #print(type(encrypted_seed_bytes),len(encrypted_seed_bytes),encrypted_seed_bytes)
                 seed_bytes = self.rsa_decrypt(encrypted_seed_bytes)
                 seed_value = int.from_bytes(seed_bytes[:4], 'big')
                 print("Hash of extracted seed:", hashlib.sha256(seed_bytes[:4]).hexdigest())
-                len_data= int.from_bytes(seed_bytes[4:], 'big')
+                len_data= int.from_bytes(seed_bytes[4:8], 'big')
+                expected_hash=seed_bytes[8:40]
 
                 if len_data <= 0:
-                    print("Invalid extracted data length.")
+                    print("Error: Invalid extracted data length.")
                     return None
             else:
-                print("RSA decryption required but disabled.")
+                print("Error: RSA decryption required but disabled.")
                 return None
 
             #random.seed(seed_value)
             total_pixels = height * width * channels
-            data_start_index = self.SEED_HEADER_PIXELS * 3
+            data_start_index = HEADER_PIXELS * channels
             print(total_pixels,data_start_index,"total_pixels","data_start_index")
             len_bits= len_data * 8
             #get execution time
@@ -228,6 +233,7 @@ class ImageEncryptorlsb:
 
             rng = np.random.default_rng(seed_value)
             time.start1=time.time()
+            print("data_start_index",data_start_index,"total_pixels",total_pixels,"len_bits",len_bits,"rng.choice")
             positions = rng.choice(np.arange(data_start_index, total_pixels), size=len_bits, replace=False)
             time.end1=time.time()
             print("Execution time rng.choice:", time.end1 - time.start1)
@@ -253,7 +259,7 @@ class ImageEncryptorlsb:
             #print("Extracted length:", length)
 
             if length <= 0:
-                print("Invalid extracted length.")
+                print("Error: Invalid extracted length.")
                 return None
             print("Extracted length:", type(length),length,length*8)
             # Extract actual message
@@ -264,14 +270,13 @@ class ImageEncryptorlsb:
             # Pack bits into bytes (8 bits per byte, MSB first)
             output = np.packbits(message_bits_np).tobytes()
 
-            #for loop python bits to bytes
-            """output = bytearray()
-            #print("Extracted message bits:", message_bits)
-            for i in range(0, len(message_bits), 8):
-                byte = 0
-                for j in range(8):
-                    byte = (byte << 1) | message_bits[i + j]
-                output.append(byte)"""
+            actual_hash = hashlib.sha256(output).digest()
+
+            if actual_hash != expected_hash:
+                print("Error: Hash mismatch! Extracted data may be corrupted or tampered with.")
+                return None
+            else:
+                print("Hash match: data integrity verified.")
 
             return bytes(output)
 
@@ -512,8 +517,11 @@ print("Seed value:", len(str(seed_value)),"text")
 
 #encryptor.hide_file_in_image("SamplePNGImage_30mbmb.png","SamplePNGImage_5mbmb.png","hidden_file_5mb_in_30mb.png")
 #encryptor.extract_file_from_image("hidden_file_5mb_in_30mb.png", "extracted_5mb_file.png")
-encryptor.hide_file_in_image_seeded("SamplePNGImage_30mbmb.png","SamplePNGImage_5mbmb.png","hidden_file_5mb_in_30mb_seeded.png", seed_value)
-extracted_file_seeded = encryptor.extract_file_from_image_seeded("hidden_file_5mb_in_30mb_seeded.png", "extracted_5mb_file_seeded.png")
+#encryptor.hide_file_in_image_seeded("SamplePNGImage_30mbmb.png","SamplePNGImage_5mbmb.png","hidden_file_5mb_in_30mb_seeded.png", seed_value)
+#extracted_file_seeded = encryptor.extract_file_from_image_seeded("hidden_file_5mb_in_30mb_seeded.png", "extracted_5mb_file_seeded.png")
+
+encryptor.hide_file_in_image_seeded("SamplePNGImage_30mbmb.png","SamplePNGImage_10mbmb – копія.png","hidden_file_10mb_in_30mb_seeded.png", seed_value)
+extracted_file_seeded = encryptor.extract_file_from_image_seeded("hidden_file_10mb_in_30mb_seeded.png", "extracted_10mb_file_seeded.png")
 """
 
 encryptor.hide_file_in_image_seeded("SamplePNGImage_20mbmb.png","SamplePNGImage_1mbmb.png","hidden_file_1mb_in_20mb_seeded.png", seed_value)
