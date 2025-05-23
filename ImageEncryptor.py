@@ -1,4 +1,5 @@
 import hashlib
+import struct
 import time
 import traceback
 import uuid
@@ -10,6 +11,7 @@ import os
 import tempfile
 import shutil
 from Crypto.Cipher import AES, DES, PKCS1_OAEP
+from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 
@@ -32,6 +34,7 @@ class ImageEncryptor:
     LEN_DATA_POSITION = SEED_SIZE + 4
     EXPECTED_SEED_HASH_POSITION = SEED_SIZE + 4 + 32
     EXPECTED_DATA_HASH_POSITION = SEED_SIZE + 4 + 32 + 32
+    CHUNK_SIZE = 64 * 1024  # 64 KB
 
     def __init__(self, cipher=None, mode=None, key=None, rsa_public_key=None, rsa_private_key=None, use_rsa_encryption=False):
         self.cipher = cipher
@@ -316,6 +319,99 @@ class ImageEncryptor:
                                                                                                  depthOrig)
         return decryptedImage
 
+    def encrypt_file(self, input_path, output_path):
+        print(self.cipher,self.mode)
+        if self.cipher != AES or self.mode not in [AES.MODE_GCM, AES.MODE_CTR]:
+            raise ValueError("Only AES with GCM or CTR mode is supported.")
+
+        # Generate IV or nonce
+        iv = get_random_bytes(12 if self.mode == 'GCM' else 16)
+
+        # Initialize AES cipher
+        if self.mode == AES.MODE_GCM:
+            cipher = AES.new(self.key, AES.MODE_GCM, nonce=iv)
+        elif self.mode == AES.MODE_CTR:
+            cipher = AES.new(self.key, AES.MODE_CTR, nonce=iv, initial_value=int.from_bytes(iv, 'big'))
+        else:
+            raise ValueError("Unsupported mode")
+
+        with open(input_path, 'rb') as fin, open(output_path, 'wb') as fout:
+            # 1. Write IV or Nonce
+            fout.write(iv)
+
+            # 2. If RSA is used, encrypt and write the symmetric key
+            if self.use_rsa_encryption and self.rsa_public_key:
+                encrypted_key = self.rsa_encrypt(self.key)
+                encrypted_key_size = len(encrypted_key)
+                fout.write(struct.pack('H', encrypted_key_size))  # 2 bytes for key size
+                fout.write(encrypted_key)
+            else:
+                fout.write(struct.pack('H', 0))  # 0-length marker
+
+            # 3. Encrypt file in chunks
+            while chunk := fin.read(self.CHUNK_SIZE):
+                encrypted_chunk = cipher.encrypt(chunk)
+                fout.write(encrypted_chunk)
+
+            # 4. Write GCM tag if needed
+            if self.mode == 'GCM':
+                fout.write(cipher.digest())
+
+    def decrypt_file(self, input_path, output_path):
+        if self.cipher != AES or self.mode not in [AES.MODE_GCM, AES.MODE_CTR]:
+            raise ValueError("Only AES with GCM or CTR mode is supported.")
+
+        with open(input_path, 'rb') as fin:
+            # 1. Read IV or nonce
+            iv = fin.read(12 if self.mode == AES.MODE_GCM else 16)
+
+            # 2. Read and decrypt symmetric key (if RSA was used)
+            encrypted_key_size = struct.unpack('H', fin.read(2))[0]
+
+            if encrypted_key_size > 0:
+                encrypted_key = fin.read(encrypted_key_size)
+                if not self.rsa_private_key:
+                    raise ValueError("RSA private key required for decryption.")
+                key = self.rsa_decrypt(encrypted_key)
+            else:
+                key = self.key
+
+            # 3. Initialize AES cipher
+            if self.mode == AES.MODE_GCM:
+                # Reserve last 16 bytes for the GCM tag
+                fin.seek(0, 2)
+                file_size = fin.tell()
+                tag_size = 16
+                encrypted_data_len = file_size - (len(iv) + 2 + encrypted_key_size + tag_size)
+
+                # Seek back to start of encrypted data
+                fin.seek(len(iv) + 2 + encrypted_key_size)
+
+                cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
+
+                with open(output_path, 'wb') as fout:
+                    total_read = 0
+                    while total_read < encrypted_data_len:
+                        to_read = min(self.CHUNK_SIZE, encrypted_data_len - total_read)
+                        chunk = fin.read(to_read)
+                        if not chunk:
+                            break
+                        fout.write(cipher.decrypt(chunk))
+                        total_read += len(chunk)
+
+                    tag = fin.read(tag_size)
+                    try:
+                        cipher.verify(tag)
+                    except ValueError:
+                        raise ValueError("GCM tag verification failed! Decryption corrupted or tampered.")
+            else:  # CTR mode
+                cipher = AES.new(key, AES.MODE_CTR, initial_value=int.from_bytes(iv, 'big'))
+                with open(output_path, 'wb') as fout:
+                    while chunk := fin.read(self.CHUNK_SIZE):
+                        fout.write(cipher.decrypt(chunk))
+
+    # GCM tag at end
+
     def encrypt_video_frames(self,input_video,compare_mode=False):
         os.makedirs("encrypted_videos", exist_ok=True)
         video_filename = os.path.basename(input_video)
@@ -392,6 +488,9 @@ class ImageEncryptor:
                 if len(encrypted_header) * 8 != self.HEADER_LENGTH_BITS_RSA:
                     print("Error: Encrypted seed has unexpected length.")
                     return False
+            else:
+                print("Error: RSA encryption required but disabled.")
+                return False
 
             data_to_hide = binary_data
 
@@ -618,9 +717,31 @@ class ImageEncryptor:
             # The original methods are kept for compatibility
 
 
+# Generate AES key
+aes_key = get_random_bytes(32)  # AES-256
+
+# Optional RSA keys
+rsa_key = RSA.generate(2048)
+public_key = rsa_key.publickey()
+private_key = rsa_key
+
+encryptor = ImageEncryptor(
+    cipher=AES,
+    mode=AES.MODE_GCM,
+    key=aes_key,
+    rsa_public_key=public_key,
+    rsa_private_key=private_key,
+    use_rsa_encryption=True
+)
+
+
+test_input_path="SamplePNGImage_30mbmb.png"
+encrypted_path = 'encrypted_output.bin'
+encryptor.encrypt_file(test_input_path, encrypted_path)
+print(f"Encrypted file saved to {encrypted_path}")
 
 
 
-
-
-
+decrypted_path = 'decrypted_output.bin'
+encryptor.decrypt_file(encrypted_path, decrypted_path)
+print(f"Decrypted file saved to {decrypted_path}")

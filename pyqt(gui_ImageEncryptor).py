@@ -93,7 +93,7 @@ class MyApp(QtWidgets.QWidget):
             border-radius: 5px;
         """)
 
-        self.rsa_checkbox = QCheckBox("Use RSA Encryption / Decryption wit symmetric key")
+        self.rsa_checkbox = QCheckBox("Use RSA to Encrypt/Decrypt symmetric key")
         self.rsa_key_status_label = QLabel("RSA key status:")
         self.rsa_key_status_entry = QLineEdit()
 
