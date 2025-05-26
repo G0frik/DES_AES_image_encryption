@@ -3,7 +3,6 @@ import struct
 import time
 import traceback
 import uuid
-from functools import wraps
 
 import cv2
 import numpy as np
@@ -14,6 +13,8 @@ from Crypto.Cipher import AES, DES, PKCS1_OAEP
 from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
+from functools import wraps
+from screeninfo import get_monitors
 
 
 
@@ -136,8 +137,54 @@ class ImageEncryptor:
 
     @staticmethod
     def display_image(image, title):
-        cv2.imshow(title, image)
-        cv2.waitKey()
+        try:
+            # Get primary monitor's dimensions
+            monitor = get_monitors()[0]
+            screen_w = monitor.width
+            screen_h = monitor.height
+
+            # Get image dimensions
+            img_h, img_w = image.shape[:2]
+
+            # Image to be displayed (could be original or resized)
+            display_img = image
+
+            # Check if image dimensions are larger than screen dimensions
+            if img_w > screen_w or img_h > screen_h:
+                # Calculate scaling ratio to fit within screen while maintaining aspect ratio
+                width_ratio = screen_w / img_w
+                height_ratio = screen_h / img_h
+                # Use the smaller ratio to ensure the image fits both horizontally and vertically
+                scale_ratio = min(width_ratio, height_ratio)
+
+                # Calculate new dimensions for the scaled image
+                new_width = int(img_w * scale_ratio)
+                new_height = int(img_h * scale_ratio)
+
+                print(
+                    f"Original image ({img_w}x{img_h}) is larger than screen ({screen_w}x{screen_h}). Resizing to {new_width}x{new_height}.")
+
+                display_img = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
+
+            # Get dimensions of the image that will actually be displayed (original or resized)
+            display_img_h, display_img_w = display_img.shape[:2]
+
+            # Calculate top-left corner (x, y) for the window to be centered
+            x = max(0, (screen_w - display_img_w) // 2)
+            y = max(0, (screen_h - display_img_h) // 2)
+
+            cv2.imshow(title, display_img)
+            cv2.moveWindow(title, x, y)  # Move the window to the calculated position
+
+        except ImportError:
+            print(
+                "Warning: 'screeninfo' module not found. Window may not be centered or resized. Install with 'pip install screeninfo'.")
+            cv2.imshow(title, image)
+        except Exception as e:
+            print(f"Could not get screen dimensions, resize, or move window. Using default display: {e}")
+            cv2.imshow(title, image)
+
+        cv2.waitKey(0)
         cv2.destroyAllWindows()
 
     def rsa_encrypt(self, data: bytes) -> bytes:
@@ -185,7 +232,7 @@ class ImageEncryptor:
 
                 nonceSize = len(nonce)
                 tagSize = len(tag)
-                rsa_key_size = 256 if self.rsa_public_key else 0
+                rsa_key_size = 256 if self.rsa_public_key and self.use_rsa_encryption else 0
 
                 void = columnOrig * depthOrig - nonceSize - tagSize - rsa_key_size
                 parts = [nonce, tag]
@@ -204,7 +251,7 @@ class ImageEncryptor:
                 ciphertext = cipher.encrypt(imageBytes)
 
                 nonceSize = 12
-                rsa_key_size = 256 if self.rsa_public_key else 0
+                rsa_key_size = 256 if self.rsa_public_key and self.use_rsa_encryption else 0
 
                 void = columnOrig * depthOrig - nonceSize - rsa_key_size
                 parts = [nonce]
@@ -228,7 +275,7 @@ class ImageEncryptor:
         ciphertext = cipher.encrypt(imageBytesPadded)
 
         paddedSize = len(imageBytesPadded) - len(imageBytes)
-        rsa_key_size = 256 if self.rsa_public_key else 0
+        rsa_key_size = 256 if self.rsa_public_key and self.use_rsa_encryption else 0
 
         void = columnOrig * depthOrig - ivSize - paddedSize - rsa_key_size
         parts = []
@@ -319,98 +366,175 @@ class ImageEncryptor:
                                                                                                  depthOrig)
         return decryptedImage
 
+    @timeit
     def encrypt_file(self, input_path, output_path):
-        print(self.cipher,self.mode)
+        #print(f"Encrypting with Cipher: {self.cipher}, Mode: {self.mode}")
         if self.cipher != AES or self.mode not in [AES.MODE_GCM, AES.MODE_CTR]:
-            raise ValueError("Only AES with GCM or CTR mode is supported.")
+            if os.path.exists(output_path):
+                try:
+                    os.remove(output_path)
+                except OSError:
+                    pass
+            raise ValueError("File Encryption: Only AES with GCM or CTR mode is supported.")
 
         # Generate IV or nonce
-        iv = get_random_bytes(12 if self.mode == 'GCM' else 16)
+        iv_size = 12 if self.mode == AES.MODE_GCM else 16
+        iv = get_random_bytes(iv_size)
 
         # Initialize AES cipher
+
         if self.mode == AES.MODE_GCM:
-            cipher = AES.new(self.key, AES.MODE_GCM, nonce=iv)
+            cipher_obj = AES.new(self.key, AES.MODE_GCM, nonce=iv)
         elif self.mode == AES.MODE_CTR:
-            cipher = AES.new(self.key, AES.MODE_CTR, nonce=iv, initial_value=int.from_bytes(iv, 'big'))
-        else:
-            raise ValueError("Unsupported mode")
+            cipher_obj = AES.new(self.key, AES.MODE_CTR, nonce=iv)  # Simplified CTR nonce usage
+        else:  # Should be caught by the initial check
+            if os.path.exists(output_path):
+                try:
+                    os.remove(output_path)
+                except OSError:
+                    pass
+            raise ValueError("Unsupported AES mode for file encryption.")
 
-        with open(input_path, 'rb') as fin, open(output_path, 'wb') as fout:
-            # 1. Write IV or Nonce
-            fout.write(iv)
+        try:
+            with open(input_path, 'rb') as fin, open(output_path, 'wb') as fout:
+                # 1. Write IV or Nonce
+                fout.write(iv)
 
-            # 2. If RSA is used, encrypt and write the symmetric key
-            if self.use_rsa_encryption and self.rsa_public_key:
-                encrypted_key = self.rsa_encrypt(self.key)
-                encrypted_key_size = len(encrypted_key)
-                fout.write(struct.pack('H', encrypted_key_size))  # 2 bytes for key size
-                fout.write(encrypted_key)
-            else:
-                fout.write(struct.pack('H', 0))  # 0-length marker
+                # 2. If RSA is used, encrypt and write the symmetric key
+                if self.use_rsa_encryption:
+                    if not self.rsa_public_key:
+                        raise ValueError("RSA public key not set for symmetric key encryption.")
+                    if not self.key:
+                        raise ValueError("Symmetric key (self.key) is not set for RSA encryption wrapper.")
 
-            # 3. Encrypt file in chunks
-            while chunk := fin.read(self.CHUNK_SIZE):
-                encrypted_chunk = cipher.encrypt(chunk)
-                fout.write(encrypted_chunk)
+                    encrypted_sym_key = self.rsa_encrypt(self.key)  # Assuming rsa_encrypt is defined
+                    encrypted_key_size = len(encrypted_sym_key)
+                    fout.write(struct.pack('>H', encrypted_key_size))  # Use network byte order (big-endian) for struct
+                    fout.write(encrypted_sym_key)
+                else:
+                    fout.write(struct.pack('>H', 0))  # 0-length marker if RSA not used
 
-            # 4. Write GCM tag if needed
-            if self.mode == 'GCM':
-                fout.write(cipher.digest())
+                # 3. Encrypt file in chunks
+                while True:
+                    chunk = fin.read(self.CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    encrypted_chunk = cipher_obj.encrypt(chunk)
+                    fout.write(encrypted_chunk)
 
+                # 4. Write GCM tag if needed (after all data is encrypted)
+                if self.mode == AES.MODE_GCM:
+                    tag = cipher_obj.digest()  # Get the MAC tag
+                    fout.write(tag)
+
+            print(f"File '{input_path}' successfully encrypted to '{output_path}'.")
+            return True  # Indicate success
+
+        except Exception as e:
+            # Clean up partially written output file on any error during the process
+            if os.path.exists(output_path):
+                try:
+                    os.remove(output_path)
+                    print(f"Removed partially written output file due to error: {output_path}")
+                except OSError as e_os:
+                    print(f"Error removing output file {output_path}: {e_os}")
+            raise  # Re-raise the caught exception to be handled by the caller (MyApp)
+
+    @timeit
     def decrypt_file(self, input_path, output_path):
+        #print(f"Decrypting with Cipher: {self.cipher}, Mode: {self.mode}")
         if self.cipher != AES or self.mode not in [AES.MODE_GCM, AES.MODE_CTR]:
-            raise ValueError("Only AES with GCM or CTR mode is supported.")
+            raise ValueError("File Decryption: Only AES with GCM or CTR mode is supported.")
 
-        with open(input_path, 'rb') as fin:
-            # 1. Read IV or nonce
-            iv = fin.read(12 if self.mode == AES.MODE_GCM else 16)
+        decrypted_key_to_use = self.key
 
-            # 2. Read and decrypt symmetric key (if RSA was used)
-            encrypted_key_size = struct.unpack('H', fin.read(2))[0]
+        try:
+            with open(input_path, 'rb') as fin:
+                # 1. Read IV or nonce
+                iv_size = 12 if self.mode == AES.MODE_GCM else 16
+                iv = fin.read(iv_size)
+                if len(iv) != iv_size:
+                    raise ValueError("File is too short or corrupted (IV/Nonce).")
 
-            if encrypted_key_size > 0:
-                encrypted_key = fin.read(encrypted_key_size)
-                if not self.rsa_private_key:
-                    raise ValueError("RSA private key required for decryption.")
-                key = self.rsa_decrypt(encrypted_key)
-            else:
-                key = self.key
+                encrypted_key_size_bytes = fin.read(2)
+                if len(encrypted_key_size_bytes) != 2:
+                    raise ValueError("File is too short or corrupted (Encrypted Key Size).")
+                encrypted_key_size = struct.unpack('>H', encrypted_key_size_bytes)[0]
 
-            # 3. Initialize AES cipher
-            if self.mode == AES.MODE_GCM:
-                # Reserve last 16 bytes for the GCM tag
-                fin.seek(0, 2)
-                file_size = fin.tell()
-                tag_size = 16
-                encrypted_data_len = file_size - (len(iv) + 2 + encrypted_key_size + tag_size)
+                if encrypted_key_size > 0:
+                    encrypted_sym_key = fin.read(encrypted_key_size)
+                    if len(encrypted_sym_key) != encrypted_key_size:
+                        raise ValueError("File is too short or corrupted (Encrypted Key).")
+                    if not self.rsa_private_key:
+                        raise ValueError("RSA private key required for symmetric key decryption.")
+                    decrypted_key_to_use = self.rsa_decrypt(encrypted_sym_key)  # Assuming rsa_decrypt is defined
 
-                # Seek back to start of encrypted data
-                fin.seek(len(iv) + 2 + encrypted_key_size)
+                # 3. Initialize AES cipher
+                if self.mode == AES.MODE_GCM:
+                    cipher_obj = AES.new(decrypted_key_to_use, AES.MODE_GCM, nonce=iv)
+                elif self.mode == AES.MODE_CTR:
+                    cipher_obj = AES.new(decrypted_key_to_use, AES.MODE_CTR, nonce=iv)
+                else:  # Should be caught by initial check
+                    raise ValueError("Unsupported AES mode for file decryption.")
 
-                cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
+                if self.mode == AES.MODE_GCM:
 
-                with open(output_path, 'wb') as fout:
-                    total_read = 0
-                    while total_read < encrypted_data_len:
-                        to_read = min(self.CHUNK_SIZE, encrypted_data_len - total_read)
-                        chunk = fin.read(to_read)
-                        if not chunk:
-                            break
-                        fout.write(cipher.decrypt(chunk))
-                        total_read += len(chunk)
+                    current_pos = fin.tell()
+                    fin.seek(0, os.SEEK_END)
+                    total_file_size = fin.tell()
+                    tag_size = 16
 
-                    tag = fin.read(tag_size)
-                    try:
-                        cipher.verify(tag)
-                    except ValueError:
-                        raise ValueError("GCM tag verification failed! Decryption corrupted or tampered.")
-            else:  # CTR mode
-                cipher = AES.new(key, AES.MODE_CTR, initial_value=int.from_bytes(iv, 'big'))
-                with open(output_path, 'wb') as fout:
-                    while chunk := fin.read(self.CHUNK_SIZE):
-                        fout.write(cipher.decrypt(chunk))
+                    ciphertext_end_pos = total_file_size - tag_size
+                    if ciphertext_end_pos < current_pos:
+                        raise ValueError("File is too short or corrupted (GCM tag missing).")
 
-    # GCM tag at end
+                    fin.seek(current_pos)  # Go back to where ciphertext starts
+
+                    with open(output_path, 'wb') as fout:
+                        while fin.tell() < ciphertext_end_pos:
+                            chunk = fin.read(min(self.CHUNK_SIZE, ciphertext_end_pos - fin.tell()))
+                            if not chunk:
+                                break
+                            decrypted_chunk = cipher_obj.decrypt(chunk)
+                            fout.write(decrypted_chunk)
+
+                        tag = fin.read(tag_size)
+                        if len(tag) != tag_size:
+                            raise ValueError("File is too short or corrupted (GCM tag incomplete).")
+
+                        try:
+                            cipher_obj.verify(tag)
+                            print("GCM tag verification passed!")
+                        except ValueError as e_tag:
+                            if os.path.exists(output_path):
+                                try:
+                                    os.remove(output_path)
+                                    print(f"Removed invalid output file due to GCM tag mismatch: {output_path}")
+                                except OSError as e_os_remove:
+                                    print(f"Error removing output file {output_path}: {e_os_remove}")
+                            raise ValueError(
+                                f"GCM tag verification failed! File may be corrupted or tampered. ({e_tag})")
+                else:  # CTR mode
+                    with open(output_path, 'wb') as fout:
+                        while True:
+                            chunk = fin.read(self.CHUNK_SIZE)
+                            if not chunk:
+                                break
+                            decrypted_chunk = cipher_obj.decrypt(chunk)
+                            fout.write(decrypted_chunk)
+
+            print(f"File '{input_path}' successfully decrypted to '{output_path}'.")
+            return True
+        except Exception as e:
+            if os.path.exists(output_path):
+                try:
+                    os.remove(output_path)
+                    print(f"Removed partially written output file due to error: {output_path}")
+                except OSError as e_os:
+                    print(f"Error removing output file {output_path}: {e_os}")
+            raise
+
+
 
     def encrypt_video_frames(self,input_video,compare_mode=False):
         os.makedirs("encrypted_videos", exist_ok=True)
@@ -503,8 +627,11 @@ class ImageEncryptor:
             # Calculate maximum data capacity
             max_data_capacity = height * width * channels - self.HEADER_LENGTH_BITS_RSA
             if (self.HEADER_LENGTH_BITS_RSA + len(binary_bits)) > max_data_capacity:
-                print("Error: Data + seed too large for image.")
-                return False
+                required_size_bytes=self.HEADER_LENGTH_BITS_RSA + len(binary_bits) // 8
+                size_diff= f"Required size of bytes: {required_size_bytes} vs available size in image: {max_data_capacity // 8}"
+                error=f"Error: Data + seed too large for image. {size_diff}"
+                #print(error)
+                return False,error
 
             # Step 3: Embed encrypted header at fixed pixel range of constant header length
 
@@ -717,31 +844,30 @@ class ImageEncryptor:
             # The original methods are kept for compatibility
 
 
-# Generate AES key
-aes_key = get_random_bytes(32)  # AES-256
-
-# Optional RSA keys
-rsa_key = RSA.generate(2048)
-public_key = rsa_key.publickey()
-private_key = rsa_key
-
-encryptor = ImageEncryptor(
-    cipher=AES,
-    mode=AES.MODE_GCM,
-    key=aes_key,
-    rsa_public_key=public_key,
-    rsa_private_key=private_key,
-    use_rsa_encryption=True
-)
-
-
-test_input_path="SamplePNGImage_30mbmb.png"
-encrypted_path = 'encrypted_output.bin'
-encryptor.encrypt_file(test_input_path, encrypted_path)
-print(f"Encrypted file saved to {encrypted_path}")
+# # Generate AES key
+# aes_key = get_random_bytes(32)  # AES-256
+#
+#
+# public_key = RSA.importKey(open("rsa_keys\\publickey_20250424113120.pem").read())
+# private_key = RSA.importKey(open("rsa_keys\\privatekey_20250424113120.pem").read())
+#
+# encryptor = ImageEncryptor(
+#     cipher=AES,
+#     mode=AES.MODE_GCM,
+#     #key=aes_key,
+#     #rsa_public_key=public_key,
+#     rsa_private_key=private_key,
+#     use_rsa_encryption=True
+# )
 
 
-
-decrypted_path = 'decrypted_output.bin'
-encryptor.decrypt_file(encrypted_path, decrypted_path)
-print(f"Decrypted file saved to {decrypted_path}")
+# test_input_path="test_large_input_file.bin"
+# encrypted_path = 'encrypted_output.bin'
+# #encryptor.encrypt_file(test_input_path, encrypted_path)
+# print(f"Encrypted file saved to {encrypted_path}")
+#
+#
+#
+# decrypted_path = 'decrypted_output.bin'
+# encryptor.decrypt_file(encrypted_path, decrypted_path)
+# print(f"Decrypted file saved to {decrypted_path}")
