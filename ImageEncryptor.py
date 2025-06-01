@@ -117,6 +117,7 @@ class ImageEncryptor:
                 out.release()
             if os.path.exists(frame_dir):
                 shutil.rmtree(frame_dir, ignore_errors=True)
+        return output_video_path
 
     def generate_key(self, cipher_type):
         if cipher_type == DES:
@@ -557,8 +558,9 @@ class ImageEncryptor:
 
         print(f"Frames extracted from '{input_video}' and encrypted to '{temp_frame_dir[0]}' using {self.mode}.")
         print(f"Encrypted frames ready for reassembly into '{output_video_name}'.")
-        ImageEncryptor.reassemble_video_from_frames(temp_frame_dir[0], output_video_name, fps=temp_frame_dir[1],
+        output_path=ImageEncryptor.reassemble_video_from_frames(temp_frame_dir[0], output_video_name, fps=temp_frame_dir[1],
                                      compare_mode=compare_mode)
+        return output_path
 
     def hide_data_in_image_seeded(self, img, binary_data, output_path=None):
         """
@@ -674,7 +676,7 @@ class ImageEncryptor:
 
             print("Execution time hiding bits:", time_end - time_start)
             print("Data hidden successfully.")
-            return img
+            return True, img
 
         except Exception as e:
             print(f"Error hiding data: {e}")
@@ -845,20 +847,20 @@ class ImageEncryptor:
 
 
 # # Generate AES key
-# aes_key = get_random_bytes(32)  # AES-256
-#
-#
-# public_key = RSA.importKey(open("rsa_keys\\publickey_20250424113120.pem").read())
-# private_key = RSA.importKey(open("rsa_keys\\privatekey_20250424113120.pem").read())
-#
-# encryptor = ImageEncryptor(
-#     cipher=AES,
-#     mode=AES.MODE_GCM,
-#     #key=aes_key,
-#     #rsa_public_key=public_key,
-#     rsa_private_key=private_key,
-#     use_rsa_encryption=True
-# )
+aes_key = get_random_bytes(32)  # AES-256
+
+
+public_key = RSA.importKey(open("rsa_keys\\publickey_20250525211835.pem").read())
+private_key = RSA.importKey(open("rsa_keys\\privatekey_20250525211835.pem").read())
+
+encryptor = ImageEncryptor(
+    cipher=AES,
+    mode=AES.MODE_ECB,
+    key=aes_key,
+    rsa_public_key=public_key,
+    rsa_private_key=private_key,
+    use_rsa_encryption=True
+)
 
 
 # test_input_path="test_large_input_file.bin"
@@ -866,7 +868,7 @@ class ImageEncryptor:
 # #encryptor.encrypt_file(test_input_path, encrypted_path)
 # print(f"Encrypted file saved to {encrypted_path}")
 #
-#
+#encryptor.encrypt_video_frames("tux-clear_LMuIBRWw.mp4")
 #
 # decrypted_path = 'decrypted_output.bin'
 # encryptor.decrypt_file(encrypted_path, decrypted_path)

@@ -1,0 +1,18 @@
+{
+    "educational": {
+        "public_key_path": "",
+        "private_key_path": "",
+        "use_rsa": false,
+        "use_lsb": false,
+        "cipher_name": "AES",
+        "crypto_mode_name": "ECB"
+    },
+    "fully_secure": {
+        "public_key_path": "",
+        "private_key_path": "",
+        "use_rsa": true,
+        "use_lsb": false,
+        "cipher_name": "AES",
+        "crypto_mode_name": "GCM"
+    }
+}

@@ -1,0 +1,103 @@
+/* test_styles.qss */
+
+/* --- Global ---
+
+
+/* --- Hamburger Button --- */
+QPushButton#hamburgerButton {
+    font-size: 24px;
+    border: none;
+    background-color: transparent;
+}
+QPushButton#hamburgerButton:hover {
+    color: #55aaff;
+}
+
+/* --- Mode Option Buttons (Educational/Secure) --- */
+QPushButton#modeOptionButton {
+    padding: 10px;
+    border-radius: 5px;
+    text-align: left;
+    font-size: 13px;
+}
+QPushButton#modeOptionButton:checked {
+    background-color: #0078D7;
+    color: white;
+    border: 1px solid #005A9E;
+}
+QPushButton#modeOptionButton:hover:!checked {
+    background-color: #555;
+}
+
+/* --- Theme Toggle Button --- */
+QPushButton#theme_toggle_button {
+    background-color: transparent;
+}
+
+/* --- Header Widget --- */
+QWidget#appHeader {
+}
+QWidget#appHeader[theme="dark"] {
+    background-color: #3E444A; /* Should match sidebarContainer dark background */
+    border-bottom: 1px solid #50555A; /* Separator line to content below */
+}
+QWidget#appHeader[theme="light"] {
+    background-color: #EAEAEA; /* Should match sidebarContainer light background */
+    border-bottom: 1px solid #C8C8C8; /* Separator line to content below */
+}
+
+/* --- Sidebar Area --- */
+QWidget#sidebarContainer {
+    /* Common properties for sidebar container if any */
+}
+QWidget#sidebarContainer[theme="dark"] {
+    background-color: #3E444A;
+    border-right: 1px solid #50555A; /* VERTICAL SEPARATOR LINE */
+    /* Adjust radius for a clean look with the border */
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-top-right-radius: 0px;   /* Sharp corner where border-right is */
+    border-bottom-right-radius: 0px;/* Sharp corner where border-right is */
+}
+QWidget#sidebarContainer[theme="light"] {
+    background-color: #EAEAEA;
+    border-right: 1px solid #C8C8C8; /* VERTICAL SEPARATOR LINE */
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-top-right-radius: 0px;
+    border-bottom-right-radius: 0px;
+}
+
+/* Panel within sidebar, holding mode buttons */
+QWidget#modeSelectionPanel {
+    background-color: transparent;
+    border: none;
+}
+
+/* --- Central Mode Display Label (in Header) --- */
+QLabel#modeDisplayLabel {
+    font-size: 16px; /* Adjusted for header */
+    font-weight: bold;
+    qproperty-alignment: 'AlignVCenter | AlignLeft'; /* Align left in header */
+    padding-left: 5px; /* Add some padding if needed */
+}
+QLabel#modeDisplayLabel[theme="dark"] {
+    color: rgba(220, 220, 220, 200); /* Lighter for dark header */
+}
+QLabel#modeDisplayLabel[theme="light"] {
+    color: rgba(30, 30, 30, 200); /* Darker for light header */
+}
+
+/* --- Main Vertical Separator (between left/right columns in main content) --- */
+
+QFrame#mainContentSeparator[theme="dark"] {
+    background-color: #455364; /* Or a more subtle border color from the theme */
+}
+QFrame#mainContentSeparator[theme="light"] {
+    background-color: #D3D3D3;
+}
+
+/* Main Content Area  */
+QWidget#mainContentArea {
+    background-color: transparent; /* Ensures it uses the main window background */
+}

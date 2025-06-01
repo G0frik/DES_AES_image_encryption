@@ -16,3 +16,4 @@ decrypted_images/
 frames/
 frames_*/
 *.avi
+*.enc
