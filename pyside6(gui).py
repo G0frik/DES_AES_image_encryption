@@ -1,6 +1,8 @@
 import os
 import sys
 import tempfile
+import traceback
+
 import cv2
 import numpy as np
 from Crypto.Cipher import DES, AES
@@ -1231,6 +1233,9 @@ class MyApp(QtWidgets.QWidget):
         self.encryptor.cipher = self.cipher_combobox.currentData()
         self.encryptor.mode = self.mode_combobox.currentData()
 
+        if self.encryptor.key is None:
+            show_alert("Symmetric key is not set.")
+            return
 
         if self.encryptor.cipher is None or self.encryptor.mode is None:
             show_alert("Cipher and cryptographic mode must be selected.")
@@ -1290,13 +1295,14 @@ class MyApp(QtWidgets.QWidget):
                 print(f"Starting Educational Video Encryption for: {fp}")
                 try:
 
-                    self.encryptor.encrypt_video_frames(input_video=fp, compare_mode=True)
+                    self.encryptor.encrypt_video_frames(input_video=fp)
                     QMessageBox.information(self, "Video Encryption (Educational)",
                                             f"Educational video encryption for '{os.path.basename(fp)}' processed.\n"
                                             "Check console for details. Encrypted video is in 'encrypted_videos' folder.")
                 except AttributeError:
                     show_alert("Error: 'encrypt_video_frames' method not found in ImageEncryptor.")
                 except Exception as e:
+                    traceback.print_exc()
                     show_alert(f"Educational Video encryption failed: {str(e)}")
                 return  # Video processing ends here for Educational Mode, LSB step is skipped for video output.
 

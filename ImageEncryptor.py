@@ -10,7 +10,6 @@ import os
 import tempfile
 import shutil
 from Crypto.Cipher import AES, DES, PKCS1_OAEP
-from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 from functools import wraps
@@ -112,6 +111,7 @@ class ImageEncryptor:
             shutil.rmtree(frame_dir)
             print(f"Video saved to '{output_video_path}' and temporary directory removed.")
         except Exception as e:
+            traceback.print_exc()
             print(f"[ERROR] Failed to reassemble video: {e}")
             if 'out' in locals():
                 out.release()
@@ -233,7 +233,7 @@ class ImageEncryptor:
 
                 nonceSize = len(nonce)
                 tagSize = len(tag)
-                rsa_key_size = self.HEADER_LENGTH_BITS_RSA/8 if self.rsa_public_key and self.use_rsa_encryption else 0
+                rsa_key_size = self.HEADER_LENGTH_BITS_RSA//8 if self.rsa_public_key and self.use_rsa_encryption else 0
 
                 void = columnOrig * depthOrig - nonceSize - tagSize - rsa_key_size
                 parts = [nonce, tag]
@@ -252,7 +252,7 @@ class ImageEncryptor:
                 ciphertext = cipher.encrypt(imageBytes)
 
                 nonceSize = 12
-                rsa_key_size = self.HEADER_LENGTH_BITS_RSA/8 if self.rsa_public_key and self.use_rsa_encryption else 0
+                rsa_key_size = self.HEADER_LENGTH_BITS_RSA//8 if self.rsa_public_key and self.use_rsa_encryption else 0
 
                 void = columnOrig * depthOrig - nonceSize - rsa_key_size
                 parts = [nonce]
@@ -276,7 +276,7 @@ class ImageEncryptor:
         ciphertext = cipher.encrypt(imageBytesPadded)
 
         paddedSize = len(imageBytesPadded) - len(imageBytes)
-        rsa_key_size = self.HEADER_LENGTH_BITS_RSA/8 if self.rsa_public_key and self.use_rsa_encryption else 0
+        rsa_key_size = self.HEADER_LENGTH_BITS_RSA//8 if self.rsa_public_key and self.use_rsa_encryption else 0
 
         void = columnOrig * depthOrig - ivSize - paddedSize - rsa_key_size
         parts = []
@@ -306,7 +306,7 @@ class ImageEncryptor:
         else:
             raise ValueError("Unsupported cipher.")
 
-        rsa_key_size = self.HEADER_LENGTH_BITS_RSA/8 if self.use_rsa_encryption and self.rsa_private_key else 0
+        rsa_key_size = self.HEADER_LENGTH_BITS_RSA//8 if self.use_rsa_encryption and self.rsa_private_key else 0
         nonceSize = 12 if self.mode in [AES.MODE_CTR, AES.MODE_GCM] else 0
         ivSize = block_size if self.mode == self.cipher.MODE_CBC else 0
         tagSize = 16 if self.mode == AES.MODE_GCM else 0
@@ -551,6 +551,12 @@ class ImageEncryptor:
             encrypted_frame_path = frame_path.replace('.png', '_encrypted.png')
 
             frame_image = self.load_image(frame_path)
+            if frame_image.dtype != np.uint8:
+                print(f"Warning: Frame {frame_file} has dtype {frame_image.dtype}. Converting to uint8.")
+                if np.max(frame_image) <= 1.0:
+                    frame_image = (frame_image * 255).astype(np.uint8)
+                else:  # Otherwise, just cast it, which might truncate values
+                    frame_image = frame_image.astype(np.uint8)
             encrypted_image = self.encrypt(frame_image)
             self.save_image(encrypted_image, encrypted_frame_path)
 

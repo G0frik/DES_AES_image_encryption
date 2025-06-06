@@ -1,3 +1,4 @@
+venv
 .idea/
 __pycache__/
 __pycache__
@@ -18,3 +19,4 @@ frames_*/
 *.avi
 *.enc
 app_settings.json
+!requirements.txt
