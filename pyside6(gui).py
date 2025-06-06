@@ -2,6 +2,7 @@ import os
 import sys
 import tempfile
 import cv2
+import numpy as np
 from Crypto.Cipher import DES, AES
 from Crypto.Random import get_random_bytes
 from Crypto.PublicKey import RSA
@@ -457,7 +458,7 @@ class MyApp(QtWidgets.QWidget):
         self.mode_combobox = QComboBox()
         self.mode_combobox.setFixedHeight(30)
         self.mode_combobox.addItem("None", None)
-        self.encrypt_button = QPushButton("Encrypt Image")
+        self.encrypt_button = QPushButton("Encrypt Image / Video")
         self.decrypt_button = QPushButton("Decrypt Image")
         # Set initial dependent states
 
@@ -848,7 +849,7 @@ class MyApp(QtWidgets.QWidget):
             if sender_button == self.educational_mode_button:
                 self.current_app_mode = "Educational Mode"
                 self.encryptor.preserve_headers = True
-                self.encrypt_button.setText("Encrypt Image")
+                self.encrypt_button.setText("Encrypt Image / Video")
                 self.decrypt_button.setText("Decrypt Image")
             elif sender_button == self.fully_secure_mode_button:
                 self.current_app_mode = "Fully-Secure Mode"
@@ -1230,7 +1231,7 @@ class MyApp(QtWidgets.QWidget):
         self.encryptor.cipher = self.cipher_combobox.currentData()
         self.encryptor.mode = self.mode_combobox.currentData()
 
-        # Initial checks
+
         if self.encryptor.cipher is None or self.encryptor.mode is None:
             show_alert("Cipher and cryptographic mode must be selected.")
             return
@@ -1243,12 +1244,11 @@ class MyApp(QtWidgets.QWidget):
 
         encrypted_data_for_lsb = None
         intermediate_encrypted_filepath_for_lsb = None  # Used in Fully-Secure + LSB
-        original_input_fp_for_naming = None  # Store path of initially selected file for output naming
-        # For Educational mode image encryption when LSB is NOT checked:
+        original_input_fp_for_naming = None
         encrypted_image_obj_for_direct_save = None
 
 
-        #  Main Encryption Logic by Mode
+
         if self.current_app_mode == "Educational Mode":
             file_filter = "Media Files (*.png *.jpg *.jpeg *.bmp *.mp4 *.avi *.mov *.mkv);;" \
                           "Image Files (*.png *.jpg *.jpeg *.bmp);;" \
@@ -1260,7 +1260,7 @@ class MyApp(QtWidgets.QWidget):
 
             file_extension = os.path.splitext(fp)[1].lower()
             image_extensions = ['.png', '.jpg', '.jpeg', '.bmp']
-            video_extensions = ['.mp4', '.avi', '.mov', '.mkv']  # Add more as needed
+            video_extensions = ['.mp4', '.avi', '.mov', '.mkv']
 
             if file_extension in image_extensions:
                 try:
@@ -1435,15 +1435,15 @@ class MyApp(QtWidgets.QWidget):
             show_alert("Symmetric key is not set.")
             return
 
-        extracted_encrypted_bytes = None  # Will hold data from LSB if used
-        stego_input_fp = None  # Path of the stego image if LSB is used
+        extracted_encrypted_bytes = None
+        stego_input_fp = None
 
         if self.lsb_checkbox.isChecked():
-            if not self.encryptor.use_rsa_encryption: # Check if RSA is actually enabled for decryption
+            if not self.encryptor.use_rsa_encryption:
                 show_alert("LSB Steganography requires RSA decryption to be active to retrieve the key.")
                 return
             stego_fp, _ = QFileDialog.getOpenFileName(self, "Select Steganographic Image to Extract Data From", "",
-                                                      "Image Files (*.png *.bmp)")  # Lossless formats
+                                                      "Image Files (*.png *.bmp)")
             if not stego_fp: return
             stego_input_fp = stego_fp
             try:
@@ -1457,29 +1457,26 @@ class MyApp(QtWidgets.QWidget):
                 show_alert(f"LSB Data Extraction failed: {str(e)}")
                 return
 
-        # Now, perform decryption based on the mode (image or file)
-        # If LSB was used, `extracted_encrypted_bytes` contains the data to be decrypted.
-        # Otherwise, the user will select the encrypted file/image directly.
+
 
         if self.current_app_mode == "Educational Mode":
             dec_img = None
             try:
                 if self.lsb_checkbox.isChecked():
                     if extracted_encrypted_bytes:
-                        # Convert extracted bytes back to an image (NumPy array)
-                        import numpy as np  # Make sure this import is at the top of the file
+
                         enc_img_data = cv2.imdecode(np.frombuffer(extracted_encrypted_bytes, np.uint8),
                                                     cv2.IMREAD_UNCHANGED)
                         if enc_img_data is None:
                             raise ValueError("Could not decode extracted bytes into an image.")
                         ImageEncryptor.display_image(enc_img_data, "Extracted Encrypted Image")
                         dec_img = self.encryptor.decrypt(enc_img_data)
-                    else:  # Should not happen if LSB extraction was successful
+                    else:
                         show_alert("LSB was checked, but no data was extracted to decrypt.")
                         return
                 else:  # Normal image decryption (LSB not checked)
                     fp, _ = QFileDialog.getOpenFileName(self, "Select Encrypted Image to Decrypt", "",
-                                                        "Image Files (*.png *.jpg *.jpeg *.bmp)")  # Allow more types if needed
+                                                        "Image Files (*.png *.jpg *.jpeg *.bmp)")
                     if not fp: return
                     stego_input_fp = fp  # For consistent naming if saving
                     enc_img_data = ImageEncryptor.load_image(fp)
@@ -1535,7 +1532,7 @@ class MyApp(QtWidgets.QWidget):
                         finally:
                             if os.path.exists(temp_encrypted_input_path):
                                 os.remove(temp_encrypted_input_path)
-                    else:  # Should not happen
+                    else:
                         show_alert("LSB was checked, but no data was extracted to decrypt.")
                         return
                 else:  # Normal file decryption (LSB not checked)

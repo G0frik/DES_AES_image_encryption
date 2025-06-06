@@ -233,7 +233,7 @@ class ImageEncryptor:
 
                 nonceSize = len(nonce)
                 tagSize = len(tag)
-                rsa_key_size = 256 if self.rsa_public_key and self.use_rsa_encryption else 0
+                rsa_key_size = self.HEADER_LENGTH_BITS_RSA/8 if self.rsa_public_key and self.use_rsa_encryption else 0
 
                 void = columnOrig * depthOrig - nonceSize - tagSize - rsa_key_size
                 parts = [nonce, tag]
@@ -252,7 +252,7 @@ class ImageEncryptor:
                 ciphertext = cipher.encrypt(imageBytes)
 
                 nonceSize = 12
-                rsa_key_size = 256 if self.rsa_public_key and self.use_rsa_encryption else 0
+                rsa_key_size = self.HEADER_LENGTH_BITS_RSA/8 if self.rsa_public_key and self.use_rsa_encryption else 0
 
                 void = columnOrig * depthOrig - nonceSize - rsa_key_size
                 parts = [nonce]
@@ -276,7 +276,7 @@ class ImageEncryptor:
         ciphertext = cipher.encrypt(imageBytesPadded)
 
         paddedSize = len(imageBytesPadded) - len(imageBytes)
-        rsa_key_size = 256 if self.rsa_public_key and self.use_rsa_encryption else 0
+        rsa_key_size = self.HEADER_LENGTH_BITS_RSA/8 if self.rsa_public_key and self.use_rsa_encryption else 0
 
         void = columnOrig * depthOrig - ivSize - paddedSize - rsa_key_size
         parts = []
@@ -306,7 +306,7 @@ class ImageEncryptor:
         else:
             raise ValueError("Unsupported cipher.")
 
-        rsa_key_size = 256 if self.use_rsa_encryption and self.rsa_private_key else 0
+        rsa_key_size = self.HEADER_LENGTH_BITS_RSA/8 if self.use_rsa_encryption and self.rsa_private_key else 0
         nonceSize = 12 if self.mode in [AES.MODE_CTR, AES.MODE_GCM] else 0
         ivSize = block_size if self.mode == self.cipher.MODE_CBC else 0
         tagSize = 16 if self.mode == AES.MODE_GCM else 0
@@ -369,7 +369,6 @@ class ImageEncryptor:
 
     @timeit
     def encrypt_file(self, input_path, output_path):
-        #print(f"Encrypting with Cipher: {self.cipher}, Mode: {self.mode}")
         if self.cipher != AES or self.mode not in [AES.MODE_GCM, AES.MODE_CTR]:
             if os.path.exists(output_path):
                 try:
@@ -429,17 +428,16 @@ class ImageEncryptor:
                     fout.write(tag)
 
             print(f"File '{input_path}' successfully encrypted to '{output_path}'.")
-            return True  # Indicate success
+            return True  #
 
         except Exception as e:
-            # Clean up partially written output file on any error during the process
             if os.path.exists(output_path):
                 try:
                     os.remove(output_path)
                     print(f"Removed partially written output file due to error: {output_path}")
                 except OSError as e_os:
                     print(f"Error removing output file {output_path}: {e_os}")
-            raise  # Re-raise the caught exception to be handled by the caller (MyApp)
+            raise
 
     @timeit
     def decrypt_file(self, input_path, output_path):
@@ -489,7 +487,7 @@ class ImageEncryptor:
                     if ciphertext_end_pos < current_pos:
                         raise ValueError("File is too short or corrupted (GCM tag missing).")
 
-                    fin.seek(current_pos)  # Go back to where ciphertext starts
+                    fin.seek(current_pos)
 
                     with open(output_path, 'wb') as fout:
                         while fin.tell() < ciphertext_end_pos:
@@ -576,8 +574,6 @@ class ImageEncryptor:
         """
         time_start_start = time.time()
         try:
-            # Step 1: Read the image using OpenCV
-            #img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
             if img is None:
                 print(f"Error: Could not open image") # {image_path}")
                 return False
@@ -695,8 +691,8 @@ class ImageEncryptor:
         """
         try:
             # Step 1: Read the image using OpenCV
-            #img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
-            #if img is None:
+            # img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+            # if img is None:
             #    print(f"Error: Could not open image {image_path}")
             #    return None
 
@@ -847,21 +843,21 @@ class ImageEncryptor:
 
 
 # # Generate AES key
-aes_key = get_random_bytes(32)  # AES-256
-
-
-public_key = RSA.importKey(open("rsa_keys\\publickey_20250525211835.pem").read())
-private_key = RSA.importKey(open("rsa_keys\\privatekey_20250525211835.pem").read())
-
-encryptor = ImageEncryptor(
-    cipher=AES,
-    mode=AES.MODE_ECB,
-    key=aes_key,
-    rsa_public_key=public_key,
-    rsa_private_key=private_key,
-    use_rsa_encryption=True
-)
-
+# aes_key = get_random_bytes(32)  # AES-256
+#
+#
+# public_key = RSA.importKey(open("rsa_keys\\publickey_20250525211835.pem").read())
+# private_key = RSA.importKey(open("rsa_keys\\privatekey_20250525211835.pem").read())
+#
+# encryptor = ImageEncryptor(
+#     cipher=AES,
+#     mode=AES.MODE_ECB,
+#     key=aes_key,
+#     rsa_public_key=public_key,
+#     rsa_private_key=private_key,
+#     use_rsa_encryption=True
+# )
+#
 
 # test_input_path="test_large_input_file.bin"
 # encrypted_path = 'encrypted_output.bin'

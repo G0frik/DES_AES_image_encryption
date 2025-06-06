@@ -17,3 +17,4 @@ frames/
 frames_*/
 *.avi
 *.enc
+app_settings.json
